@@ -1,0 +1,11 @@
+---
+- name: Configure devbox
+  hosts: pve_man_devbox
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/devbox.yaml
+  tasks:
+    - name: Configure Repos
+      ansible.builtin.include_role:
+        name: configure_devbox

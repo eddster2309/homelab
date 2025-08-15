@@ -1,0 +1,7 @@
+namespace: cloudnative-pg
+resources: 
+  - ../../../../../bases/cloudnative-pg
+patches: 
+  - target: 
+      kind: HelmRelease
+    path: ./cloudnative-pg-patch.yaml

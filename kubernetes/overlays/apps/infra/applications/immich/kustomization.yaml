@@ -1,0 +1,24 @@
+namespace: immich
+resources: 
+  - ../../../../../bases/immich
+  - database/
+  - data-pvc.yaml
+  - oidc-secret.yaml
+components:
+  - ../../../../../components/ca-certs/
+patches: 
+  - target: 
+      kind: HelmRelease
+      name: immich
+    path: immich-patch.yaml
+  - target:
+      kind: HelmRelease
+      name: immich-share
+    path: immich-share-patch.yaml
+
+# configMapGenerator:
+#   - name: immich-config
+#     files:
+#       - config/immich-config.yaml
+# generatorOptions:
+#   disableNameSuffixHash: true

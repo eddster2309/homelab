@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: gitlab
+resources:
+- ../../../../../bases/gitlab
+- postgres.yaml
+- ./secrets
+components:
+- ../../../../../components/ca-certs
+patches:
+- target:
+    kind: HelmRelease
+  path: gitlab-patch.yaml
+- target:
+    kind: Namespace
+  patch: |
+    - op: add
+      path: /metadata/labels
+      value:
+        app: gitlab

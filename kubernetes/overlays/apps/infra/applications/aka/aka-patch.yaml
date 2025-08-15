@@ -1,0 +1,35 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: aka
+spec:
+  values:
+    configuration:
+      externalHost: aka.example.com
+      oidc:
+        scopes:
+          - profile
+          - email
+          - groups
+        existingSecret:
+          name: oidc-secret
+          issuerKey: url
+          clientIdKey: client_id
+          clientSecretKey: key
+      adminGroups:
+        - "k8s-aka-admin"
+    postgresql:
+      existingSecret:
+        # name of the secret containing the psql connection string
+        name: aka-db-app
+        # field in the above secret
+        key: uri
+    ingress:
+      enabled: true
+      className: nginx
+      annotations:
+        cert-manager.io/cluster-issuer: "letsencrypt-issuer"
+      tls:
+        - secretName: tls-aka
+          hosts:
+            - aka.example.com
