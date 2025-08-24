@@ -1,0 +1,12 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMStaticScrape
+metadata:
+  name: scrape-opnsense
+spec:
+  jobName: opnsense
+  targetEndpoints:
+    - targets: ["REDACTED_IP:9100"]
+      labels:
+        job: opnsense
+
+    

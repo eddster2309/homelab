@@ -1,0 +1,21 @@
+apiVersion: dragonflydb.io/v1alpha1
+kind: Dragonfly
+metadata:
+  labels:
+    app.kubernetes.io/name: authelia-dragonfly
+    app.kubernetes.io/instance: dragonfly
+    app.kubernetes.io/part-of: dragonfly-operator
+    app.kubernetes.io/created-by: dragonfly-operator
+  name: authelia-dragonfly
+spec:
+  replicas: 3
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+    limits:
+      cpu: 600m
+      memory: 750Mi
+  args:
+    - --cluster_mode=emulated
+    - --default_lua_flags=allow-undeclared-keys
