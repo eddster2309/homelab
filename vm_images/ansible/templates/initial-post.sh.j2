@@ -1,0 +1,56 @@
+{% if ansible_distribution == "Fedora" and ansible_distribution_major_version | int >= 40 %}
+cloud-init status --wait
+{% endif %}
+
+out=$(curl "{{ pmtp_url }}?hostname=$(hostname)")
+fqdn=$(echo $out | jq '.fqdn')
+tags=$(echo $out | jq '.tags')
+ipajoin=$( echo $tags | jq 'any(. == "{{ ipa_enroll_tag }}")')
+
+if [[ "${fqdn}" == \"\" ]]
+then
+        exit 1
+fi
+
+if [[ $ipajoin != "true" ]]
+then
+        exit 1
+fi
+
+hostnamectl set-hostname $fqdn
+
+rm -f /etc/resolv.conf
+
+echo "nameserver {{ dns_server }}" >> /etc/resolv.conf
+
+{% if ansible_distribution == "Fedora" and ansible_distribution_major_version | int >= 40 %}
+systemctl disable --now systemd-resolved
+systemctl  mask systemd-resolved
+
+{% endif %}
+ipa-client-install --domain="{{ ipa_domain }}" -p "{{ ipa_enroll_user }}" -w "{{ ipa_enroll_password }}"  -U --enable-dns-updates --mkhomedir --force-join
+if [ $? -ne 0 ]
+then
+  exit 1
+fi
+
+{% if ansible_distribution == "Fedora" and ansible_distribution_major_version | int >= 40 %}
+systemctl  unmask systemd-resolved
+
+systemctl enable --now systemd-resolved
+{% endif %}
+
+systemctl restart sssd.service
+
+systemctl enable --now oddjobd.service
+
+userdel --force cloud-user
+
+userdel --force fedora
+
+rm -f /etc/sudoers.d/*
+
+growpart /dev/vda 3
+lvextend -l +100%FREE /dev/fedora/root
+
+reboot
