@@ -1,0 +1,148 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for zot
+
+# - name: Install Passlib
+#   ansible.builtin.package:
+#     name: python-passlib
+#     state: present
+
+# - name: Set default Zot version
+#   ansible.builtin.set_fact:
+#     zot_version_installed: "0.0.0"
+#   # when: not versions_file_stat.stat.exists
+
+# - name: Get latest Zot version
+#   ansible.builtin.uri:
+#     url: https://api.github.com/repos/project-zot/zot/releases/latest
+#     return_content: true
+#   register: zot_latest
+#   when: zot_version == "latest"
+
+# - name: Set Zot version
+#   ansible.builtin.set_fact:
+#     zot_version: "{{ zot_latest.json.tag_name }}"
+#   when: zot_version == "latest"
+
+# - name: Download Zot binary
+#   ansible.builtin.get_url:
+#     url: "https://github.com/project-zot/zot/releases/download/{{ zot_version }}/zot-linux-amd64"
+#     dest: "{{ zot_binary_path }}"
+#     mode: '0755'
+#     owner: root
+#     group: root
+
+# - name: Create Zot user group
+#   ansible.builtin.group:
+#     name: zot
+#     system: true
+#     state: present
+
+# - name: Create Zot user
+#   ansible.builtin.user:
+#     name: zot
+#     group: zot
+#     system: true
+#     shell: /usr/sbin/nologin
+#     create_home: false
+
+# - name: Create Zot directories
+#   ansible.builtin.file:
+#     path: "{{ item }}"
+#     state: directory
+#     mode: '0755'
+#     owner: zot
+#     group: zot
+#   loop:
+#     - "{{ zot_config_directory }}"
+#     - "{{ zot_log_directory }}"
+#     - "{{ zot_storage_directory }}"
+
+# - name: Generate Zot Self Signed Certificate
+#   when: zot_ssl_self_signed | bool
+#   block:
+#     - name: Create Zot Self Signed Cert - Private Key
+#       community.crypto.openssl_privatekey:
+#         path: "{{ zot_ssl_key_path }}"
+#         owner: zot
+#         group: zot
+#         mode: '0600'
+#         size: 2048
+
+#     - name: Create Zot Self Signed Cert - CSR
+#       community.crypto.openssl_csr_pipe:
+#         privatekey_path: "{{ zot_ssl_key_path }}"
+#         common_name: "{{ ansible_fqdn }}"
+#         organization_name: "Zot Self Signed Certificate"
+#       register: zot_csr
+
+#     - name: Create Zot Self Signed Cert - Certificate
+#       community.crypto.x509_certificate:
+#         path: "{{ zot_ssl_cert_path }}"
+#         csr_content: "{{ zot_csr.csr }}"
+#         privatekey_path: "{{ zot_ssl_key_path }}"
+#         provider: selfsigned
+
+# - name: Create Zot User Accounts
+#   ansible.builtin.template:
+#     src: zot_htpasswd.j2
+#     dest: "{{ zot_config_directory }}/htpasswd"
+#     mode: '0644'
+#     owner: zot
+#     group: zot
+#   notify: Restart Zot
+
+
+- name: Template Zot configuration file
+  ansible.builtin.template:
+    src: zot_config.yaml.j2
+    dest: "{{ zot_config_directory }}/config.yaml"
+    mode: '0644'
+    owner: zot
+    group: zot
+  notify: Restart Zot
+
+- name: Create Zot IP Tables forwarding rule
+  block:
+    - name: Create IP Tables forwarding rule
+      ansible.builtin.iptables:
+        table: nat
+        chain: PREROUTING
+        protocol: tcp
+        match: tcp
+        destination_port: 443
+        jump: REDIRECT
+        to_ports: "{{ zot_port }}"
+
+    - name: Save current state of the firewall in system file
+      community.general.iptables_state:
+        state: saved
+        path: "{{ zot_iptables_config_path }}"
+
+    - name: Template IPtables Restore
+      ansible.builtin.template:
+        src: iptables-restore.service.j2
+        dest: /etc/systemd/system/iptables-restore.service
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: Enable iptables service
+      ansible.builtin.systemd_service:
+        name: iptables-restore
+        daemon_reload: true
+        enabled: true
+
+- name: Create Zot systemd service
+  ansible.builtin.template:
+    src: zot.service.j2
+    dest: /etc/systemd/system/zot.service
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: Enable and start Zot service
+  ansible.builtin.systemd:
+    name: zot
+    enabled: true
+    state: started

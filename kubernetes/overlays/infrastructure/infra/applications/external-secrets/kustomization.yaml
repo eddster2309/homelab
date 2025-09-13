@@ -1,0 +1,14 @@
+namespace: external-secrets
+resources:
+  - ../../../../../bases/external-secrets
+patches: 
+  - target:
+      kind: HelmRelease
+    path: external-secrets-patch.yaml
+  - target:
+      kind: Namespace
+    patch: |
+      - op: add
+        path: /metadata/labels
+        value:
+          app: external-secrets

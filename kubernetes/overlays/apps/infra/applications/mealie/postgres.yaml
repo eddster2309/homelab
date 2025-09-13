@@ -1,0 +1,25 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: mealie-db
+spec:
+  instances: 2
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.6
+  storage:
+    size: 10Gi
+  backup:
+    retentionPolicy: "30d"
+    barmanObjectStore:
+      serverName: authelia-postgres-backup-01
+      destinationPath: "s3://rke-cnpg-backups"
+      endpointURL: "https://s3.example.com:443"
+      endpointCA:
+        name: ipa-ca
+        key: ca-certificates.crt
+      s3Credentials:
+        accessKeyId: 
+          name: s3-secret
+          key: AWS_ACCESS_KEY_ID
+        secretAccessKey: 
+          name: s3-secret
+          key: AWS_SECRET_ACCESS_KEY
