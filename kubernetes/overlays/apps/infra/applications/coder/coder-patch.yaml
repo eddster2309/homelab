@@ -1,0 +1,50 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: coder
+  namespace: coder
+spec:
+  chart:
+    spec:
+      version: "2.25.0"
+  values:
+    coder:
+      env:
+        - name: CODER_ACCESS_URL
+          value: "https://coder.example.com"
+        - name: CODER_WILDCARD_ACCESS_URL
+          value: "*.coder.example.com"
+        - name: CODER_PG_CONNECTION_URL
+          valueFrom:
+            secretKeyRef:
+              name: coder-db-app
+              key: uri
+        - name: CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE
+          value: "false"
+        - name: CODER_TELEMETRY_ENABLE
+          value: "false"
+        - name: CODER_OIDC_ISSUER_URL
+          value: "https://auth.example.com"
+        - name: CODER_OIDC_IGNORE_EMAIL_VERIFIED
+          value: "true"
+        - name: CODER_OIDC_CLIENT_ID
+          value: "coder"
+        - name: CODER_OIDC_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: oidc-secret
+              key: OAUTH_CLIENT_SECRET
+        - name: CODER_OIDC_SIGN_IN_TEXT
+          value: "Sign in with Eddster Auth"
+      ingress:
+        enable: true
+        className: nginx
+        host: coder.example.com
+        wildcardHost: "*.coder.example.com"
+        annotations:
+          cert-manager.io/cluster-issuer: "letsencrypt-issuer"
+          nginx.ingress.kubernetes.io/whitelist-source-range: "REDACTED_IP/0"
+        tls:
+          enable: true
+          secretName: coder-tls
+          wildcardSecretName: coder-wildcard-tls

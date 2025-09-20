@@ -1,0 +1,43 @@
+ipa_enroll_user: svc_ipa_join
+ipa_server: ipa01.internal
+ipa_domain: internal
+ipajoin_bin_location: "/usr/local/bin/ipajoin.sh"
+ipajoin_cleanup_location: "/usr/local/bin/ipajoin-cleanup.sh"
+ipa_enroll_tag: ipajoined
+dns_server: REDACTED_IP
+
+pmtp_url: "https://pve-tag-proxy.example.com"
+
+repos:
+  fedora:
+    - id: fedora-41
+      name: Fedora 41 - x86_64
+      url: http://aarnet.repos.example.com/pub/fedora/linux/releases/41/Everything/x86_64/os/
+    - id: updates
+      name: Fedora 41 - x86_64 - Updates
+      url: http://aarnet.repos.example.com/pub/fedora/linux/updates/41/Everything/x86_64/
+    - id: fedora-cisco-openh264
+      name: fedora-cisco-openh264
+      url: http://fedora-codecs.repos.example.com/openh264/41/x86_64/os/
+    - id: rpmfusion-free
+      name: RPM Fusion for Fedora 41 - Free
+      url: http://rpmfusion.repos.example.com/free/fedora/releases/41/Everything/x86_64/os/
+    - id: rpmfusion-free-updates
+      name: RPM Fusion for Fedora 41 - Free - Updates
+      url: http://rpmfusion.repos.example.com/free/fedora/updates/41/x86_64/
+    - id: rpmfusion-nonfree
+      name: RPM Fusion for Fedora 41 - Nonfree
+      url: http://rpmfusion.repos.example.com/nonfree/fedora/releases/41/Everything/x86_64/os/
+    - id: rpmfusion-nonfree-updates
+      name: RPM Fusion for Fedora 41 - Nonfree - Updates
+      url: http://rpmfusion.repos.example.com/nonfree/fedora/updates/41/x86_64/
+  Rocky:
+    - id: rocky
+      name: Rocky Linux $releasever - BaseOS
+      url: 'http://aarnet.repos.example.com/pub/rocky/$releasever/BaseOS/$basearch/os/'
+    - id: rocky-extras
+      name: Rocky Linux $releasever - Extras
+      url: 'http://aarnet.repos.example.com/pub/rocky/$releasever/extras/$basearch/os/'
+    - id: rocky-appstream
+      name: Rocky Linux $releasever - AppStream
+      url: 'http://aarnet.repos.example.com/pub/rocky/$releasever/AppStream/$basearch/os/'

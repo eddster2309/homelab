@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: paperless-ngx
+resources:
+- ../../../../../bases/paperless-ngx
+- ./database
+- ./oidc-secret.yaml
+components:
+- ../../../../../components/ca-certs
+patches:
+- target:
+    kind: HelmRelease
+  path: paperless-ngx-patch.yaml

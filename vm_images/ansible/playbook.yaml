@@ -1,0 +1,152 @@
+- name: 'Provision Image'
+  hosts: all
+  become: true
+  tasks:
+    - name: Remove all repo files
+      ansible.builtin.command:
+        cmd: "sudo rm -f /etc/yum.repos.d/*.repo"
+      when: ansible_os_family == 'RedHat'
+
+    - name: Add repos
+      ansible.builtin.yum_repository:
+        name: "us-east-1-{{ item.id }}"
+        description: "{{ item.name }} - Example Network"
+        baseurl: "{{ item.url }}"
+        enabled: true
+        gpgcheck: false
+        repo_gpgcheck: false
+      loop: "{{ repos[ansible_distribution] }}"
+      when: ansible_os_family == 'RedHat'
+
+    - name: Install Alloy
+      ansible.builtin.include_role:
+        name: grafana.grafana.alloy
+      vars:
+        alloy_env_file_vars:
+          CUSTOM_ARGS: "--server.http.listen-addr=REDACTED_IP:12345"
+        alloy_expose_port: true
+        alloy_config: "{{ lookup('template', 'alloy.conf.j2') }}"
+
+    - name: Template initial-post.sh
+      ansible.builtin.template:
+        src: initial-post.sh.j2
+        dest: /var/local/initial-post.sh
+        mode: "0755"
+
+    - name: Copy initial-post.service
+      ansible.builtin.copy:
+        src: initial-post.service
+        dest: /etc/systemd/system/initial-post.service
+        mode: "0644"
+
+    - name: Enable initial-post.service
+      ansible.builtin.systemd:
+        name: initial-post.service
+        enabled: true
+
+    - name: Install ROP
+      when: rdp_host | default(false)
+      block:
+        - name: Install EPEL
+          ansible.builtin.package:
+            name: epel-release
+            state: present
+
+        - name: Install Packages
+          ansible.builtin.package:
+            name:
+              - xrdp
+              - gdm
+              - xorgxrdp
+              - python3-pip
+              - firefox
+            state: present
+
+        - name: Remove gnome-tour
+          ansible.builtin.package:
+            name: gnome-tour
+            state: absent
+
+        - name: Allow xrdp in firewall
+          ansible.builtin.firewalld:
+            port: 3389/tcp
+            permanent: true
+            state: enabled
+
+        - name: Enable xrdp service
+          ansible.builtin.systemd:
+            name: xrdp
+            enabled: true
+            state: started
+
+        - name: Template xrdp.ini
+          ansible.builtin.template:
+            src: xrdp.ini.j2
+            dest: /etc/xrdp/xrdp.ini
+            mode: "0644"
+
+        - name: Template GDM configuration
+          ansible.builtin.template:
+            src: gdm.conf.j2
+            dest: /etc/gdm/custom.conf
+            mode: "0644"
+
+        - name: Install psutil
+          ansible.builtin.pip:
+            name: psutil
+            state: present
+
+        - name: Create branding directory
+          ansible.builtin.file:
+            path: /opt/branding
+            state: directory
+            mode: "0755"
+            owner: root
+            group: root
+
+        - name: Copy branding files
+          ansible.builtin.copy:
+            src: branding/
+            dest: /opt/branding/
+            mode: "0644"
+            owner: root
+            group: root
+
+        - name: Copy default dconf settings
+          ansible.builtin.copy:
+            src: dconf.ini
+            dest: /etc/dconf/db/local.d/00-default-settings
+            mode: "0644"
+            owner: root
+            group: root
+
+        - name: Refresh dconf database
+          ansible.builtin.command:
+            cmd: "dconf update"
+
+    - name: Place cloud.cfg
+      ansible.builtin.copy:
+        src: rocky-cloud.cfg
+        dest: /etc/cloud/cloud.cfg
+        mode: "0644"
+        owner: root
+        group: root
+
+    - name: Upgrade Packages
+      ansible.builtin.package:
+        name: "*"
+        state: latest
+      when: ansible_os_family == 'RedHat'
+
+    - name: Remove unique machine identifiers
+      ansible.builtin.command:
+        cmd: "rm -f /etc/ssh/ssh_host_* /etc/cloud/cloud.cfg.d/subiquity-disable-cloudinit-networking.cfg /etc/netplan/00-installer-config.yaml"
+
+    - name: Truncate /etc/machine-id
+      ansible.builtin.command:
+        cmd: "truncate -s 0 /etc/machine-id"
+
+    - name: Clean up cloud-init
+      ansible.builtin.command:
+        cmd: "cloud-init clean --logs"
+      when: ansible_distribution == "Fedora"

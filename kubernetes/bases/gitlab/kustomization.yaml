@@ -1,0 +1,6 @@
+namespace: gitlab
+resources:
+  - namespace.yaml
+  - release.yaml
+  - license-crt.yaml
+  - gitlab-license.yaml

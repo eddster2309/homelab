@@ -1,0 +1,78 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: paperless-ngx
+spec:
+  values:
+    image:
+      tag: 2.18.4
+    env:
+      TZ: Australia/Sydney
+      PAPERLESS_REDIS: redis://paperless-ngx-dragonfly.paperless-ngx.svc.cluster.local:6379
+      PAPERLESS_DBHOST:
+        secretKeyRef:
+          name: paperless-ngx-db-app
+          key: host
+      PAPERLESS_DBENGINE: postgresql
+      PAPERLESS_DBPORT:
+        secretKeyRef:
+          name: paperless-ngx-db-app
+          key: port
+      PAPERLESS_DBNAME:
+        secretKeyRef:
+          name: paperless-ngx-db-app
+          key: dbname
+      PAPERLESS_DBUSER:
+        secretKeyRef:
+          name: paperless-ngx-db-app
+          key: user
+      PAPERLESS_DBPASS:
+        secretKeyRef:
+          name: paperless-ngx-db-app
+          key: password
+      PAPERLESS_SOCIALACCOUNT_PROVIDERS:
+        secretKeyRef:
+          name: oidc-secret
+          key: config
+      PAPERLESS_APPS: 'allauth.socialaccount.providers.openid_connect'
+      PAPERLESS_SOCIAL_AUTO_SIGNUP: true
+      PAPERLESS_SOCIAL_ACCOUNT_SYNC_GROUPS: true
+      PAPERLESS_ACCOUNT_EMAIL_UNKNOWN_ACCOUNTS: false
+      PAPERLESS_DISABLE_REGULAR_LOGIN: true
+      PAPERLESS_REDIRECT_LOGIN_TO_SSO: true
+    ingress:
+      main:
+        enabled: true
+        annotations:
+          cert-manager.io/cluster-issuer: "letsencrypt-issuer"
+          nginx.ingress.kubernetes.io/whitelist-source-range: "REDACTED_IP/0"
+          nginx.ingress.kubernetes.io/proxy-body-size: 64m
+        hosts:
+          - host: paperless.example.com
+            paths:
+              - path: /
+        tls:
+          - hosts:
+              - paperless.example.com
+            secretName: paperless-ngx-tls
+    persistence:
+      data:
+        enabled: true
+        retain: true
+        mountPath: /usr/src/paperless/data
+        size: 10Gi
+        storageClass: longhorn
+        accessMode: ReadWriteOnce
+      media:
+        enabled: true
+        retain: true
+        mountPath: /usr/src/paperless/media
+        size: 30Gi
+        storageClass: nfs
+        accessMode: ReadWriteOnce
+      export:
+        enabled: false
+      consume:
+        enabled: false
+    redis:
+      enabled: false
