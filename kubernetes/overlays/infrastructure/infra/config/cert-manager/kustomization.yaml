@@ -1,0 +1,3 @@
+resources: 
+  - selfsignedissuer.yaml
+  - letsencrypt-issuer.yaml

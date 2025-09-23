@@ -1,0 +1,12 @@
+[Unit]
+Description=Run script for inital post-install. THis will only run once
+ConditionPathExists=/var/local/initial-post.sh
+
+[Service]
+Type=oneshot
+After=cloud-final.service
+ExecStart=/bin/bash /var/local/initial-post.sh
+ExecStop=/bin/rm /var/local/initial-post.sh
+
+[Install]
+WantedBy=multi-user.target

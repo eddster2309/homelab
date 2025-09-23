@@ -1,0 +1,71 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+local.file_match "local_files" {
+  path_targets = [{"__path__" = "/var/log/**/*.log", host = sys.env("HOSTNAME"),}]
+  sync_period = "5s"
+}
+
+loki.source.file "log_scrape" {
+  targets    = local.file_match.local_files.targets
+  forward_to = [loki.process.global_labels.receiver]
+  tail_from_end = true
+}
+
+{% if ansible_facts["os_family"] == "Debian" %}
+loki.relabel "journal" {
+  forward_to = [loki.process.global_labels.receiver]
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+}
+
+loki.source.journal "read"  {
+  forward_to    = [loki.process.global_labels.receiver]
+  relabel_rules = loki.relabel.journal.rules
+  labels        = {component = "loki.source.journal"}
+}
+{% endif %}
+
+loki.process "global_labels" {
+  forward_to = [loki.write.grafana_loki.receiver]
+
+  stage.static_labels {
+    values = {
+      host = sys.env("HOSTNAME"),
+    }
+  }
+}
+
+loki.write "grafana_loki" {
+  endpoint {
+    url = "http://loki.internal:3100/loki/api/v1/push"
+  }
+}
+
+prometheus.exporter.unix "local_system" { }
+
+prometheus.scrape "scrape_metrics" {
+  targets         = prometheus.exporter.unix.local_system.targets
+  forward_to      = [prometheus.relabel.filter_metrics.receiver]
+  scrape_interval = "10s"
+}
+
+prometheus.relabel "filter_metrics" {
+  rule {
+    action        = "drop"
+    source_labels = ["env"]
+    regex         = "dev"
+  }
+
+  forward_to = [prometheus.remote_write.metrics_service.receiver]
+}
+
+prometheus.remote_write "metrics_service" {
+  endpoint {
+      url = "https://prometheus.infra.k3s.example.com/api/v1/write"
+  }
+}
