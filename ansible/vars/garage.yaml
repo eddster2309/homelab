@@ -1,0 +1,167 @@
+vm_count: 1
+vm_template_id: fedora41
+
+vm_cpu_core_count: 6
+vm_memory: 16384
+vm_disk_size: 320
+
+vm_network: infra_core
+vm_start_ip: 80
+
+service_name: garage
+
+garage_s3_region: us-east-1
+garage_s3_root_domain: "s3.example.com"
+
+garage_vip: REDACTED_IP
+
+garge_version: "v1.1.0"
+
+garage_nginx_ssl_enabled: true
+garage_nginx_ssl_cert: /etc/letsencrypt/live/garage/fullchain.pem
+garage_nginx_ssl_key: /etc/letsencrypt/live/garage/privkey.pem
+
+garage_web_access_enabled: false
+
+garage_node_capacity: 300G
+
+garage_keepalived_enabled: false
+
+garage_buckets:
+  - name: hashicorp-vault
+  - name: rke-gitlab-registry
+  - name: rke-gitlab-lfs
+  - name: rke-gitlab-artifacts
+  - name: rke-gitlab-uploads
+  - name: rke-gitlab-packages
+  - name: rke-gitlab-backups
+  - name: rke-gitlab-tmp
+  - name: rke-gitlab-runner-cache
+  - name: rke-gitlab-pages
+  - name: rke-longhorn-backup
+  - name: rke-loki-chunks
+  - name: rke-loki-ruler
+  - name: rke-loki-admin
+  - name: rke-cnpg-backups
+  - name: rke-outline-backups
+  - name: rke-karakeep-store
+
+garage_keys:
+  - name: truenas_backup
+    id: "{{ truenas_backup_s3_key }}"
+    secret: "{{ truenas_backup_s3_secret }}"
+    buckets:
+      - name: rke-gitlab-backups
+        access:
+          - read
+      - name: rke-longhorn-backup
+        access:
+          - read
+      - name: hashicorp-vault
+        access:
+          - read
+      - name: rke-cnpg-backups
+        access:
+          - read
+  - name: hashicorp_vault_access
+    id: "{{ hashicorp_vault_s3_bucket_access_key }}"
+    secret: "{{ hashicorp_vault_s3_bucket_access_secret }}"
+    buckets:
+      - name: hashicorp-vault
+        access:
+          - read
+          - write
+          - owner
+  - name: rke_gitlab # Can't change this but will be used across the RKE cluster
+    id: "{{ rke_s3_bucket_access_key }}"
+    secret: "{{ rke_s3_bucket_access_secret }}"
+    buckets:
+      - name: rke-gitlab-registry
+        access:
+          - read
+          - write
+          - owner
+      - name: rke-gitlab-lfs
+        access:
+          - read
+          - write
+          - owner
+      - name: rke-gitlab-artifacts
+        access:
+          - read
+          - write
+          - owner
+      - name: rke-gitlab-uploads
+        access:
+          - read
+          - write
+          - owner
+      - name: rke-gitlab-packages
+        access:
+          - read
+          - write
+          - owner
+      - name: rke-gitlab-backups
+        access:
+          - read
+          - write
+          - owner
+      - name: rke-gitlab-tmp
+        access:
+          - read
+          - write
+          - owner
+      - name: rke-gitlab-runner-cache
+        access:
+          - read
+          - write
+          - owner
+      - name: rke-gitlab-pages
+        access:
+          - read
+          - write
+          - owner
+      - name: rke-longhorn-backup
+        access:
+          - read
+          - write
+          - owner
+      - name: rke-loki-chunks
+        access:
+          - read
+          - write
+          - owner
+      - name: rke-loki-ruler
+        access:
+          - read
+          - write
+          - owner
+      - name: rke-loki-admin
+        access:
+          - read
+          - write
+          - owner
+      - name: rke-cnpg-backups
+        access:
+          - read
+          - write
+          - owner
+      - name: rke-outline-backups
+        access:
+          - read
+          - write
+          - owner
+      - name: rke-karakeep-store
+        access:
+          - read
+          - write
+          - owner
+  - name: gitlab_runner_cache
+    id: "{{ gitlab_runner_cache_key }}"
+    secret: "{{ gitlab_runner_cache_secret }}"
+    buckets:
+      - name: rke-gitlab-runner-cache
+        access:
+          - read
+          - write
+          - owner
