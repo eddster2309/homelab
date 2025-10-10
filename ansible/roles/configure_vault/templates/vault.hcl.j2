@@ -1,0 +1,25 @@
+# {{ ansible_managed }}
+
+# Full configuration options can be found at https://developer.hashicorp.com/vault/docs/configuration
+
+ui = true
+
+# HTTPS listener
+listener "tcp" {
+  address       = "REDACTED_IP:8200"
+  tls_cert_file = "{{ configure_vault_certificate_dir }}/ssl.pem"
+  tls_key_file  = "{{ configure_vault_certificate_dir }}/ssl.key"
+}
+
+storage "s3" {
+    access_key = "{{ vault_s3_access_key }}"
+    secret_key = "{{ vault_s3_secret_key }}"
+    bucket = "{{ vault_s3_bucket }}"
+    region = "{{ vault_s3_region }}"
+    endpoint = "{{ vault_s3_endpoint }}"
+    s3_force_path_style = "true"
+}
+
+user_lockout "all" {
+  disable_lockout = "true"
+}

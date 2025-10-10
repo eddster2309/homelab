@@ -1,0 +1,39 @@
+- name: Deploy infrastructure
+  hosts: localhost
+  vars_files:
+    - vars/garage.yaml
+  tasks:
+    - name: Deploy garage node on proxmox
+      ansible.builtin.include_role:
+        name: node_create
+
+- name: Deploy garage
+  hosts: pve_ans_garage
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/garage.yaml
+  tasks:
+    - name: Install required packages
+      ansible.builtin.package:
+        name:
+          - certbot
+          - python3-certbot-dns-cloudflare
+          - nginx
+        state: present
+
+    - name: Place Cloudflare credentials
+      ansible.builtin.template:
+        src: cloud-proxy/cloudflare.ini.j2
+        dest: /etc/letsencrypt/cloudflare.ini
+        mode: '0600'
+        owner: root
+        group: root
+
+    - name: Generate certbot SSL certificate
+      ansible.builtin.command:
+        cmd: "certbot certonly --dns-cloudflare --dns-cloudflare-credentials /etc/letsencrypt/cloudflare.ini --non-interactive --agree-tos -d '*.{{ garage_s3_root_domain }}' -d '{{ garage_s3_root_domain }}' --post-hook 'systemctl reload nginx' --email {{ nginx_reverse_proxy_cloudflare_email }} --cert-name garage"
+        
+    - name: Install garage
+      ansible.builtin.include_role:
+        name: /home/jack/git/ansible-role-garage

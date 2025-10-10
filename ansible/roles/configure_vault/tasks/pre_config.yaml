@@ -1,0 +1,37 @@
+- name: Template vault.hcl
+  ansible.builtin.template:
+    src: vault.hcl.j2
+    dest: /etc/vault.d/vault.hcl
+    mode: "0644"
+    owner: vault
+    group: vault
+  notify: Restart Vault
+
+- name: Set Internal URL fact
+  ansible.builtin.set_fact:
+    vault_internal_url: "{{ vault_url }}:8200"
+
+- name: Set VAULT_ADDR environment variable permanent
+  ansible.builtin.lineinfile:
+    path: /etc/profile.d/vault.sh
+    line: "export VAULT_ADDR={{ vault_internal_url }}"
+    create: true
+    mode: "0644"
+    owner: root
+    group: root
+
+- name: Install pip
+  ansible.builtin.package:
+    name: python3-pip
+    state: present
+
+- name: Install python requirements
+  ansible.builtin.pip:
+    name:
+      - hvac
+
+- name: Add Hostname to /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    line: "REDACTED_IP {{ ansible_fqdn }}"
+    state: present
