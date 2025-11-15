@@ -1,0 +1,17 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: aka
+spec:
+  interval: 30m
+  install:
+    remediation:
+      retries: -1
+  upgrade: 
+    remediation:
+      retries: -1
+  releaseName: aka
+  chartRef:
+    kind: OCIRepository
+    name: aka
+    namespace: flux-system

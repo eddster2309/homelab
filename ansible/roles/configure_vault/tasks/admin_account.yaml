@@ -1,0 +1,10 @@
+- name: Enable User Pass
+  ansible.builtin.command: "vault auth enable userpass"
+  register: out
+  changed_when: out.rc == 0
+  failed_when: out.rc != 0 and out.rc != 2
+
+- name: Create admin service account
+  ansible.builtin.command: "vault write auth/userpass/users/{{ vault_svc_account_name }} password={{ vault_svc_account_password }} policies=admin"
+  register: vault_svc_account
+  changed_when: vault_svc_account.rc == 0

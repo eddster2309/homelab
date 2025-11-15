@@ -1,0 +1,23 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: openshift-console
+  namespace: openshift-console
+spec:
+  dependsOn: []
+  install:
+    remediation:
+      retries: -1
+  upgrade: 
+    remediation:
+      retries: -1
+  interval: 30m
+  chart:
+    spec:
+      chart: openshift-console
+      version: "*"
+      sourceRef:
+        kind: HelmRepository
+        name: ashmantis
+        namespace: flux-system
+      interval: 12h
