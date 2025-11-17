@@ -1,0 +1,52 @@
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: external-service-home-assistant
+  labels:
+    kubernetes.io/service-name: external-service-home-assistant # Must be present for EndpointSlice and equal to Service name for automatic mapping - with having it in place, you can change the name of EndpointSlice to something else. The official convention is using Service name as the prefix.
+addressType: IPv4
+ports:
+  - port: 8123
+endpoints:
+  - addresses:
+    - "REDACTED_IP"
+    conditions:
+      ready: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-service-home-assistant
+spec:
+  ports:
+    - port: 8123
+      protocol: TCP
+      targetPort: 8123
+      name: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: external-service-home-assistant
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: "letsencrypt-issuer"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - home.example.com
+    secretName: home-example.com-tls
+  rules:
+    - host: home.example.com
+      http:
+        paths:
+        - backend:
+            service:
+              name: external-service-home-assistant
+              port:
+                number: 8123
+          path: /
+          pathType: ImplementationSpecific

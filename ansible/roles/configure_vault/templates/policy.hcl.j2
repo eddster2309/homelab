@@ -1,0 +1,7 @@
+# {{ ansible_managed }}
+
+{% for rule in item.rules %}
+path "{{ rule.path }}" {
+  capabilities = [{% for cap in rule.capabilities %}"{{ cap }}"{{ ", " if not loop.last else "" }}{% endfor %}]
+}
+{% endfor %}

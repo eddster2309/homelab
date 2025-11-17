@@ -1,0 +1,79 @@
+- name: Deploy infrastructure
+  hosts: localhost
+  vars_files:
+    - vars/blocky.yaml
+  tasks:
+    - name: Deploy Blocky nodes on proxmox
+      ansible.builtin.include_role:
+        name: node_create
+
+- name: Deploy K3s
+  hosts: pve_ans_blocky
+  become: true
+  gather_facts: true
+  vars:
+    ansible_user: cloud-user
+  vars_files:
+    - vars/blocky.yaml
+  tasks:
+    - name: Allow ports
+      ansible.posix.firewalld:
+        port: "{{ item }}"
+        permanent: true
+        state: enabled
+      loop:
+        - 4000/tcp
+        - 53/udp
+
+    - name: Disable resolved
+      ansible.builtin.systemd_service:
+        name: systemd-resolved
+        state: stopped
+        masked: true
+
+    - name: Remove resolv.conf
+      ansible.builtin.file:
+        path: /etc/resolv.conf
+        state: absent
+
+    - name: Touch new resolv
+      ansible.builtin.file:
+        path: /etc/resolv.conf
+        state: touch
+        mode: "644"
+        owner: root
+        group: root
+
+    - name: Insert dns into /etc/resolv.conf
+      ansible.builtin.lineinfile:
+        dest: /etc/resolv.conf
+        line: "nameserver {{ item }}"
+      loop: "{{ blocky_host_dns_server }}"
+
+    - name: Set SELinux to disabled state
+      ansible.posix.selinux:
+        state: disabled
+      when: ansible_os_family == "RedHat"
+
+    - name: Reload firewalld
+      ansible.builtin.command: firewall-cmd --reload
+      register: process_status
+      changed_when: false
+
+    - name: Install Blocky
+      ansible.builtin.include_role:
+        name: ngine_io.blocky_dns
+
+    - name: Install keepalived
+      ansible.builtin.include_role:
+        name: evrardjp.keepalived
+      vars:
+        keepalived_show_ansible_managed: true
+        keepalived_instances:
+          internal:
+            interface: "{{ ansible_default_ipv4.interface }}"
+            state: "{{ (groups['pve_ans_blocky'].index(inventory_hostname) == 0) | ternary('MASTER', 'BACKUP') }}"
+            virtual_router_id: "{{ vrrp_id | default(42) }}"
+            priority: "{{ (inventory_hostname == groups['pve_ans_blocky'][0]) | ternary('200', '100') }}"
+            vips:
+              - "{{ vrrp_ip }} dev {{ ansible_default_ipv4.interface }}"

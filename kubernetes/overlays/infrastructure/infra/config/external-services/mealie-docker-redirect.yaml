@@ -1,0 +1,14 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: 
+  annotations: 
+    nginx.ingress.kubernetes.io/permanent-redirect: "https://mealie.example.com"
+    cert-manager.io/cluster-issuer: "letsencrypt-issuer"
+  name: mealie-docker-redirect
+spec: 
+  tls:
+  - hosts:
+    - mealie.example.com
+    secretName: mealie--redirect-example.com-tls
+  rules: 
+  - host: mealie.example.com
