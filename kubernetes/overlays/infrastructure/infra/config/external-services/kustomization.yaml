@@ -1,0 +1,6 @@
+namespace: ingress-nginx
+resources:
+  - home-assistant.yaml
+  - frigate.yaml
+  - mealie-docker-redirect.yaml
+  - kasm.yaml

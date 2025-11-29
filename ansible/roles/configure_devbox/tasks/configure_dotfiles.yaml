@@ -1,0 +1,31 @@
+- name: Clone dotfiles # noqa: latest[git]
+  ansible.builtin.git:
+    repo: https://github.com/eddster2309/dotfiles.git
+    dest: /opt/dotfiles
+    accept_hostkey: true
+    update: true
+
+- name: Find all files in dotfiles
+  ansible.builtin.find:
+    paths: /opt/dotfiles/bash
+    recurse: false
+    hidden: true
+    file_type: any
+  register: dotfiles
+
+- name: Debug dotfiles
+  ansible.builtin.debug:
+    var: dotfiles
+
+- name: Remove existing dotfiles
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/{{ item.path | basename }}"
+    state: absent
+  loop: "{{ dotfiles.files }}"
+
+- name: Symlink dotfiles
+  ansible.builtin.file:
+    src: "{{ item.path }}"
+    dest: "/home/{{ ansible_user }}/{{ item.path | basename }}"
+    state: link
+  loop: "{{ dotfiles.files }}"

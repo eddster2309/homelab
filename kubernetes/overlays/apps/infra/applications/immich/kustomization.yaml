@@ -1,0 +1,19 @@
+namespace: immich
+resources: 
+  - ../../../../../bases/immich
+  - database/
+  - oidc-secret.yaml
+  - s3-secrets.yaml
+  - nfs-data-pvc.yaml
+components:
+  - ../../../../../components/ca-certs/
+patches: 
+  - target: 
+      kind: HelmRelease
+      name: immich
+    path: immich-patch.yaml
+  - target:
+      kind: HelmRelease
+      name: immich-share
+    path: immich-share-patch.yaml
+

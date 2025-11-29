@@ -1,0 +1,43 @@
+#SPDX-License-Identifier: MIT-0
+---
+# defaults file for zot
+zot_version: "latest"
+
+zot_url: "https://registry01.infra.internal"
+
+zot_ssl_self_signed: true
+zot_ssl_cert_path: /etc/zot/server.cert
+zot_ssl_key_path: /etc/zot/server.key
+
+zot_binary_path: /usr/bin/zot
+zot_config_directory: /etc/zot
+zot_log_directory: /var/log/zot
+zot_storage_directory: /var/lib/zot
+
+zot_log_level: debug
+
+zot_port: 8080
+
+zot_user_accounts:
+  - username: admin
+    password: admin123
+  - username: user
+    password: user123
+
+zot_iptables_config_path: /etc/sysconfig/iptables
+
+zot_ui_enabled: true
+
+zot_registry_sync:
+  - urls:
+      - https://docker.io/library
+    content:
+      - prefix: "**"
+        destination: "/dockerio"
+    onDemand: true
+    tlsVerify: true
+
+zot_access_control:
+  - path: "dockerio/**"
+    anonymous:
+      - read
