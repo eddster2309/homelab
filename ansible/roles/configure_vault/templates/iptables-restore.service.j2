@@ -1,0 +1,11 @@
+[Unit]
+Description=Restore IPTables configuration
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c '/usr/sbin/iptables-restore < {{ configure_vault_iptables_config_path }}'
+
+[Install]
+WantedBy=multi-user.target
+

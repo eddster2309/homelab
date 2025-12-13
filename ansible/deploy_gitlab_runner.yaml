@@ -1,0 +1,35 @@
+- name: Deploy infrastructure
+  hosts: localhost
+  vars_files:
+    - vars/gitlab_runner.yaml
+  tasks:
+    - name: Deploy gitlab runner on proxmox
+      ansible.builtin.include_role:
+        name: node_create
+
+- name: Deploy Runners
+  hosts: pve_ans_gitlab_runner
+  gather_facts: true
+  vars_files:
+    - vars/gitlab_runner.yaml
+  tasks:
+    - name: Create Gitlab Runner in Gitlab
+      community.general.gitlab_runner:
+        api_url: "{{ gitlab_runner_gitlab_url }}"
+        description: "{{ inventory_hostname }}"
+        api_username: svc_gitlab_admin
+        api_password: "{{ svc_gitlab_admin_password }}"
+        state: present
+        active: true
+        run_untagged: true
+        locked: false
+      register: runner_config
+      delegate_to: localhost
+
+    - name: Install Docker
+      ansible.builtin.include_role:
+        name: geerlingguy.docker
+
+    - name: Install Gitlab Runner
+      ansible.builtin.include_role:
+        name: riemers.gitlab-runner
