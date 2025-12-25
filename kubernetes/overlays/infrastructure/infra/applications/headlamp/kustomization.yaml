@@ -1,0 +1,8 @@
+namespace: headlamp
+resources: 
+- ./oidc-secret.yaml
+- ../../../../../bases/headlamp
+patches: 
+  - target: 
+      kind: HelmRelease
+    path: ./headlamp-patch.yaml

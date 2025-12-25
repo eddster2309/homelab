@@ -1,0 +1,31 @@
+- name: Create certificate directory
+  ansible.builtin.file:
+    path: "{{ configure_vault_certificate_dir }}"
+    state: directory
+    mode: '0755'
+    owner: "vault"
+    group: "vault"
+
+- name: Request IPA certificate for host
+  ansible.builtin.shell: |-
+    ipa-getcert request -K HTTP/$(hostname) -k "{{ configure_vault_certificate_dir }}"/ssl.key \
+    -f "{{ configure_vault_certificate_dir }}"/ssl.pem -g 2048 -D $(hostname)
+  become: true
+  register: out
+  changed_when: out.rc == 0
+  failed_when: out.rc != 0 and out.rc != 2
+
+- name: Pause for certificate
+  ansible.builtin.pause:
+    seconds: 5
+  when: out.changed # noqa: no-handler
+
+- name: Set ceritifcate file permissions
+  ansible.builtin.file:
+    path: "{{ configure_vault_certificate_dir }}"
+    state: directory
+    recurse: true
+    mode: '0755'
+    owner: "vault"
+    group: "vault"
+  notify: Restart Vault
