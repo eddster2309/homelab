@@ -1,0 +1,73 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: coder
+  namespace: coder
+spec:
+  chart:
+    spec:
+      version: "2.29.1"
+  values:
+    coder:
+      env:
+        - name: CODER_ACCESS_URL
+          value: "https://coder.example.com"
+        - name: CODER_WILDCARD_ACCESS_URL
+          value: "*.coder.example.com"
+        - name: CODER_PG_CONNECTION_URL
+          valueFrom:
+            secretKeyRef:
+              name: coder-db-app
+              key: uri
+        - name: CODER_OAUTH2_GITHUB_DEFAULT_PROVIDER_ENABLE
+          value: "false"
+        - name: CODER_TELEMETRY_ENABLE
+          value: "false"
+        - name: CODER_OIDC_ISSUER_URL
+          value: "https://auth.example.com"
+        - name: CODER_OIDC_IGNORE_EMAIL_VERIFIED
+          value: "true"
+        - name: CODER_OIDC_CLIENT_ID
+          value: "coder"
+        - name: CODER_OIDC_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: oidc-secret
+              key: OAUTH_CLIENT_SECRET
+        - name: CODER_OIDC_SIGN_IN_TEXT
+          value: "Sign in with Eddster Auth"
+        - name: CODER_EXTERNAL_AUTH_0_ID
+          value: eddster-gitlab
+        - name: CODER_EXTERNAL_AUTH_0_TYPE
+          value: gitlab
+        - name: CODER_EXTERNAL_AUTH_0_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: gitlab-secret
+              key: id
+        - name: CODER_EXTERNAL_AUTH_0_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: gitlab-secret
+              key: secret
+        - name: CODER_EXTERNAL_AUTH_0_DISPLAY_NAME
+          value: "Eddster GitLab"
+        - name: CODER_EXTERNAL_AUTH_0_DISPLAY_ICON
+          value: "https://cdn.jsdelivr.net/gh/selfhst/icons@master/svg/gitlab.svg"
+        - name: CODER_EXTERNAL_AUTH_0_VALIDATE_URL
+          value: https://gitlab.example.com/oauth/token/info
+        - name: CODER_EXTERNAL_AUTH_0_AUTH_URL
+          value: https://gitlab.example.com/oauth/authorize
+        - name: CODER_EXTERNAL_AUTH_0_TOKEN_URL
+          value: https://gitlab.example.com/oauth/token
+        - name: CODER_EXTERNAL_AUTH_0_REVOKE_URL
+          value: https://gitlab.example.com/oauth/revoke
+        - name: CODER_EXTERNAL_AUTH_0_REGEX
+          value: "gitlab\\.k8s\\.eddster\\.com"
+      ingress:
+        enable: true
+        className: nginx
+        host: coder.example.com
+        wildcardHost: "*.coder.example.com"
+        annotations:
+          nginx.ingress.kubernetes.io/whitelist-source-range: "REDACTED_IP/0"

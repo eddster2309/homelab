@@ -1,0 +1,9 @@
+namespace: cloudnative-pg
+resources: 
+  - ../../../../../bases/cloudnative-pg
+  - ./s3-secret.yaml
+  - ./s3-object-store.yaml
+patches: 
+  - target: 
+      kind: HelmRelease
+    path: ./cloudnative-pg-patch.yaml
