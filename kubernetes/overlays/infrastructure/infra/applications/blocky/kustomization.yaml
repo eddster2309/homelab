@@ -1,0 +1,10 @@
+namespace: blocky
+resources: 
+  - ../../../../../bases/blocky
+  - load-balancer.yaml
+components:
+  - ../../../../../components/ca-certs/
+patches: 
+  - target: 
+      kind: HelmRelease
+    path: blocky-patch.yaml

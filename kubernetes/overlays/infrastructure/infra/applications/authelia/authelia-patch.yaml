@@ -1,0 +1,119 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: authelia
+spec:
+  chart:
+    spec:
+      chart: authelia
+      version: "0.10.49"
+      sourceRef:
+        kind: HelmRepository
+        name: authelia
+        namespace: flux-system
+  values: 
+    annotations:
+      reloader.stakater.com/auto: "true"
+    ingress:
+      enabled: true
+      annotations:
+        nginx.ingress.kubernetes.io/whitelist-source-range: "REDACTED_IP/0"
+        nginx.ingress.kubernetes.io/enable-cors: "true"
+    secret:
+      additionalSecrets:
+        encryption-key:
+          items: []
+        authelia-db-app:
+          items: []
+        ldap-bind-password:
+          items:
+            - key: bind_password
+              path: bind_password
+        smtp-secret:
+          items: []
+        pw-reset:
+          items:
+            - key: jwt
+              path: jwt
+    certificates:
+      existingSecret: ipa-ca
+    pod:
+      annotations:
+        reloader.stakater.com/auto: "true"
+      env:
+        - name: AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD_FILE
+          value: /secrets/ldap-bind-password/bind_password
+      extraVolumeMounts:
+        - name: acl
+          mountPath: /config/config.acl.yaml
+          subPath: config.acl.yaml
+        - name: ldap
+          mountPath: /config/config.ldap.yaml
+          subPath: config.ldap.yaml
+        - name: oidc
+          mountPath: /config/config.oidc.yaml
+          subPath: config.oidc.yaml
+      extraVolumes:
+        - name: acl
+          configMap:
+            name: acl-config
+        - name: ldap
+          configMap:
+            name: ldap-config
+        - name: oidc
+          secret:
+            secretName: oidc-clients
+    configMap:
+      telemetry:
+        metrics:
+          serviceMonitor:
+            enabled: true
+      theme: dark
+      authentication_backend:
+        password_reset:
+          disable: false
+      identity_validation:
+        reset_password:
+          secret:
+            secret_name: pw-reset
+            path: jwt
+      totp:
+        disable: false
+        issuer: "Eddster Homelab"
+      webauthn:
+        disable: true
+      extraConfigs:
+        - "/config/config.ldap.yaml"
+        - "/config/config.oidc.yaml"
+        - "/config/config.acl.yaml"
+      storage:
+        encryption_key:
+          secret_name: encryption-key
+          path: encryption_key
+        postgres:
+          enabled: true
+          address: "tcp://authelia-db-rw.authelia.svc.cluster.local:5432"
+          database: app
+          username: app
+          password:
+            secret_name: authelia-db-app
+            path: password
+      session:
+        name: authelia_infra_session
+        cookies:
+        - subdomain: auth.k8s
+          domain: example.com
+        redis:
+          enabled: true
+          host: authelia-dragonfly.authelia.svc.cluster.local
+          port: 6379
+      notifier:
+        smtp:
+          enabled: true
+          address: "submissions://smtp.example.com:465"
+          username: "rke-eddster-authelia"
+          password:
+            secret_name: smtp-secret
+            path: secret
+          sender: "Eddster Auth <authelia-noreply@example.com>"
+          subject: "{title}"

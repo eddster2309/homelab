@@ -1,0 +1,22 @@
+collections:
+  - name: freeipa.ansible_freeipa
+  - name: prometheus.prometheus
+  - name: community.general
+  - name: ansible.utils
+  - name: community.general
+  - name: ansible.posix
+  - name: kubernetes.core
+  - name: grafana.grafana
+roles:
+  - name: lablabs.rke2
+  - name: robertdebock.bootstrap
+  - name: robertdebock.core_dependencies
+  - name: robertdebock.hashicorp
+  - name: robertdebock.vault
+  - name: robertdebock.epel
+  - name: robertdebock.xrdp
+  - src: https://github.com/ngine-io/ansible-role-blocky-dns
+    version: main
+  - name: evrardjp.keepalived
+  - name: riemers.gitlab-runner
+  - name: geerlingguy.docker
