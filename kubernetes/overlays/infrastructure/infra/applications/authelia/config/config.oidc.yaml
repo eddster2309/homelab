@@ -1,0 +1,228 @@
+identity_providers:
+  oidc:
+    claims_policies:
+      ## Creates the 'default' claims policy.
+      default:
+        id_token: ['groups', 'email', 'email_verified', 'alt_emails', 'preferred_username', 'name']
+    jwks:
+      - key: |
+{{ .config_jwks_key | indent 10 }}
+    hmac_secret: '{{ .config_hmac_secret }}'
+    cors:
+      allowed_origins: "https://*.example.com"
+      allowed_origins_from_client_redirect_uris: true
+    clients:
+      - client_id: 'kubelogin'
+        client_name: 'KubeAPI'
+        # client_secret: '{{ .kubelogin_password_hash }}'  # The digest of 'insecure_secret'.
+        public: true
+        claims_policy: 'default'
+        require_pkce: true
+        pkce_challenge_method: 'S256'
+        authorization_policy: 'one_factor'
+        consent_mode: implicit
+        redirect_uris:
+          - http://localhost:8000
+          - http://localhost:18000
+          - https://console.example.com/auth/callback
+          - https://headlamp.example.com/oidc-callback
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+          - 'groups'
+        userinfo_signed_response_alg: 'none'
+      - client_id: 'gitlab'
+        client_name: 'GitLab'
+        client_secret: '{{ .gitlab_password_hash }}'  # The digest of 'insecure_secret'.
+        public: false
+        authorization_policy: 'one_factor'
+        consent_mode: implicit
+        pre_configured_consent_duration: 6M
+        token_endpoint_auth_method: 'client_secret_basic'
+        redirect_uris:
+          - 'https://gitlab.example.com/users/auth/openid_connect/callback'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+          - 'groups'
+        userinfo_signed_response_alg: 'none'
+      - client_id: 'karakeep'
+        client_name: 'Karakeep'
+        client_secret: '{{ .karakeep_password_hash }}'  # The digest of 'insecure_secret'.
+        public: false
+        require_pkce: false
+        pkce_challenge_method: ''
+        authorization_policy: 'one_factor'
+        consent_mode: implicit
+        redirect_uris:
+          - 'https://karakeep.example.com/api/auth/callback/custom'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+          - 'groups'
+        response_types:
+          - 'code'
+        grant_types:
+          - 'authorization_code'
+        access_token_signed_response_alg: 'none'
+        userinfo_signed_response_alg: 'none'
+        token_endpoint_auth_method: 'client_secret_basic'
+        claims_policy: 'default'
+      - client_id: 'grafana'
+        client_name: 'Grafana'
+        client_secret: '{{ .grafana_password_hash }}'  # The digest of 'insecure_secret'.
+        public: false
+        authorization_policy: 'one_factor'
+        consent_mode: implicit
+        require_pkce: true
+        pkce_challenge_method: 'S256'
+        redirect_uris:
+          - 'https://grafana.example.com/login/generic_oauth'
+        scopes:
+          - 'openid'
+          - 'email'
+          - 'profile'
+          - 'groups'
+        response_types:
+          - 'code'
+        grant_types:
+          - 'authorization_code'
+        access_token_signed_response_alg: 'none'
+        userinfo_signed_response_alg: 'none'
+        token_endpoint_auth_method: 'client_secret_basic'
+      - client_id: 'mealie'
+        client_name: 'Mealie'
+        claims_policy: 'default'
+        client_secret: '{{ .mealie_password_hash }}'  # The digest of 'insecure_secret'.
+        public: false
+        authorization_policy: 'one_factor'
+        consent_mode: implicit
+        pre_configured_consent_duration: 6M
+        token_endpoint_auth_method: 'client_secret_basic'
+        pkce_challenge_method: 'S256'
+        redirect_uris:
+          - 'https://mealie.example.com/login'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+          - 'groups'
+        response_types:
+          - 'code'
+        grant_types:
+          - 'authorization_code'
+        access_token_signed_response_alg: 'none'
+        userinfo_signed_response_alg: 'none'
+      - client_id: 'immich'
+        client_name: 'Immich'
+        client_secret: '{{ .immich_password_hash }}'  # The digest of 'insecure_secret'.
+        public: false
+        require_pkce: false
+        authorization_policy: 'one_factor'
+        consent_mode: implicit
+        redirect_uris:
+          - 'https://immich.example.com/auth/login'
+          - 'https://immich.example.com/user-settings'
+          - 'app.immich:///oauth-callback'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+          - 'groups'
+        response_types:
+          - 'code'
+        grant_types:
+          - 'authorization_code'
+        id_token_signed_response_alg: 'RS256'
+        userinfo_signed_response_alg: 'RS256'
+        token_endpoint_auth_method: 'client_secret_post'
+      - client_id: 'coder'
+        client_name: 'Coder'
+        client_secret: '{{ .coder_password_hash }}'  # The digest of 'insecure_secret'.
+        public: false
+        require_pkce: false
+        authorization_policy: 'one_factor'
+        consent_mode: implicit
+        redirect_uris:
+          - 'https://coder.example.com/api/v2/users/oidc/callback'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+          - 'groups'
+        response_types:
+          - 'code'
+        grant_types:
+          - 'authorization_code'
+        id_token_signed_response_alg: 'RS256'
+        userinfo_signed_response_alg: 'RS256'
+        token_endpoint_auth_method: 'client_secret_post'
+      - client_id: 'paperless-ngx'
+        client_name: 'Paperless'
+        client_secret: '{{ .paperless_password_hash }}'  # The digest of 'insecure_secret'.
+        public: false
+        require_pkce: true
+        pkce_challenge_method: 'S256'
+        authorization_policy: 'one_factor'
+        consent_mode: implicit
+        redirect_uris:
+          - 'https://paperless.example.com/accounts/oidc/authelia/login/callback/'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+          - 'groups'
+        response_types:
+          - 'code'
+        grant_types:
+          - 'authorization_code'
+        access_token_signed_response_alg: 'none'
+        userinfo_signed_response_alg: 'none'
+        token_endpoint_auth_method: 'client_secret_basic'
+      - client_id: 'freshrss'
+        client_name: 'FreshRSS'
+        client_secret: '{{ .freshrss_password_hash }}'  # The digest of 'insecure_secret'.
+        public: false
+        authorization_policy: 'one_factor'
+        require_pkce: false
+        pkce_challenge_method: ''
+        redirect_uris:
+          - 'https://freshrss.example.com/i/oidc/'
+        scopes:
+          - 'openid'
+          - 'groups'
+          - 'email'
+          - 'profile'
+        response_types:
+          - 'code'
+        grant_types:
+          - 'authorization_code'
+        access_token_signed_response_alg: 'none'
+        userinfo_signed_response_alg: 'none'
+        token_endpoint_auth_method: 'client_secret_basic'
+      - client_id: dashy
+        client_name: Dashy
+        public: true
+        claims_policy: 'default'
+        authorization_policy: 'one_factor'
+        require_pkce: true
+        pkce_challenge_method: 'S256'
+        consent_mode: implicit
+        redirect_uris:
+          - https://dashy.example.com
+        grant_types:
+          - authorization_code
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+          - 'groups'
+          - 'roles'
+        response_types:
+          - 'code'
+        access_token_signed_response_alg: 'none'
+        userinfo_signed_response_alg: 'none'
+        token_endpoint_auth_method: 'none'

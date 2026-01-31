@@ -1,0 +1,29 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: blocky
+spec:
+  chart:
+    spec:
+      version: "19.5.2"
+  values:
+    service:
+      dot:
+        enabled: false
+      https:
+        enabled: false
+      k8sgateway:
+        enabled: false
+    upstreams:
+      - name: default
+        dnsservers:
+          - REDACTED_IP
+          - REDACTED_IP
+    blocking:
+      blacklist:
+        - name: default
+          lists:
+            - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+    
+    k8sgateway:
+      enabled: false

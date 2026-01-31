@@ -1,0 +1,8 @@
+namespace: traefik
+resources: 
+  - ../../../../../bases/traefik
+  - secretstore.yaml
+patches: 
+  - target:
+      kind: HelmRelease
+    path: ./traefik-patch.yaml
