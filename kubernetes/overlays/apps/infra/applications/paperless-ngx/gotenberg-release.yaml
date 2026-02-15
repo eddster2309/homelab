@@ -1,0 +1,15 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: gotenberg
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: gotenberg
+      version: "1.17.0"
+      sourceRef:
+        kind: HelmRepository
+        name: maikumori
+        namespace: flux-system
+      interval: 12h

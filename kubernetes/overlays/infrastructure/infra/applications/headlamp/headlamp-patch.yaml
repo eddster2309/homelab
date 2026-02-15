@@ -1,0 +1,56 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: headlamp
+spec:
+  chart:
+    spec:
+      version: "0.40.0"
+  values:
+    config:
+      # pluginsDir: /build/plugins
+      # extraArgs:
+      #   - -oidc-use-pkce=true
+      oidc:
+        clientID: kubelogin
+        issuerURL: https://auth.example.com
+        usePKCE: true
+        scopes: "profile,email,groups"
+        # externalSecret:
+        #   enabled: true
+        #   name: oidc-secret
+    ingress:
+      enabled: true
+      annotations:
+        nginx.ingress.kubernetes.io/auth-method: 'GET'
+        nginx.ingress.kubernetes.io/auth-signin: "https://auth.example.com?rm=$request_method"
+        nginx.ingress.kubernetes.io/auth-url: "http://authelia.authelia.svc.cluster.local/api/authz/auth-request"
+      ingressClassName: nginx
+      hosts:
+        - host: headlamp.example.com
+          paths:
+            - path: /
+              type: ImplementationSpecific
+    # initContainers:
+    #   - command:
+    #       - /bin/sh
+    #       - -c
+    #       - mkdir -p /build/plugins && cp -r /plugins/* /build/plugins/
+    #     image: ghcr.io/headlamp-k8s/headlamp-plugin-flux:latest
+    #     imagePullPolicy: Always
+    #     name: headlamp-plugins
+    #     volumeMounts:
+    #       - mountPath: /build/plugins
+    #         name: headlamp-plugins
+    # persistentVolumeClaim:
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   enabled: true
+    #   size: 1Gi
+    # volumeMounts:
+    #   - mountPath: /build/plugins
+    #     name: headlamp-plugins
+    # volumes:
+    #   - name: headlamp-plugins
+    #     persistentVolumeClaim:
+    #       claimName: headlamp

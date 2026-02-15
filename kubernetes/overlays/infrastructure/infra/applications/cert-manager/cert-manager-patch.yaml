@@ -1,0 +1,31 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cert-manager
+spec:
+  chart:
+    spec:
+      chart: cert-manager
+      version: "v1.19.3"
+      sourceRef:
+        kind: HelmRepository
+        name: jetstack
+        namespace: flux-system
+  values: 
+    dns01RecursiveNameserversOnly: false
+    dns01RecursiveNameservers: "REDACTED_IP:53,REDACTED_IP:53"
+    crds:
+      enabled: true
+    volumes:
+      - name: ca-bundle
+        configMap:
+          name: ipa-ca
+    volumeMounts:
+      - name: ca-bundle
+        mountPath: /etc/ssl/certs/ca-certificates.crt
+        subPath: ca-certificates.crt
+        readOnly: false
+    prometheus:
+      enabled: true
+      servicemonitor:
+        enabled: true

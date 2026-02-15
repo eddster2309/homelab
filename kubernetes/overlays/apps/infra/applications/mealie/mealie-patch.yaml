@@ -1,0 +1,74 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: mealie
+spec:
+  values:
+    controllers:
+      mealie:
+        containers:
+          app:
+            image:
+              tag: v3.10.2
+            env:
+              ALLOW_SIGNUP: false
+              ALLOW_PASSWORD_LOGIN: false
+              BASE_URL: "https://mealie.example.com"
+              TZ: Australia/Sydney
+              API_DOCS: false
+              MAX_WORKERS: "2"
+              WEB_CONCURRENCY: "2"
+              OIDC_AUTH_ENABLED: true
+              OIDC_SIGNUP_ENABLED: true
+              OIDC_CONFIGURATION_URL: https://auth.example.com/.well-known/openid-configuration
+              OIDC_REMEMBER_ME: true
+              OIDC_CLIENT_ID: mealie
+              OIDC_PROVIDER_NAME: "Eddster Auth"
+              OIDC_AUTO_REDIRECT: true
+              OIDC_ADMIN_GROUP: k8s-mealie-admin
+              OIDC_USER_GROUP: k8s-mealie-access
+              OIDC_CLIENT_SECRET:
+                valueFrom:
+                  secretKeyRef:
+                    name: oidc-secret
+                    key: key
+              POSTGRES_USER:
+                valueFrom:
+                  secretKeyRef:
+                    name: mealie-db-app
+                    key: username
+              POSTGRES_PASSWORD:
+                valueFrom:
+                  secretKeyRef:
+                    name: mealie-db-app
+                    key: password
+              POSTGRES_SERVER:
+                valueFrom:
+                  secretKeyRef:
+                    name: mealie-db-app
+                    key: host
+              POSTGRES_PORT:
+                valueFrom:
+                  secretKeyRef:
+                    name: mealie-db-app
+                    key: port
+              POSTGRES_DB:
+                valueFrom:
+                  secretKeyRef:
+                    name: mealie-db-app
+                    key: dbname
+            envFrom:
+    ingress:
+      app:
+        className: nginx
+        annotations:
+          nginx.ingress.kubernetes.io/proxy-body-size: 20m
+          nginx.ingress.kubernetes.io/whitelist-source-range: "REDACTED_IP/0"
+        hosts:
+          - host: mealie.example.com
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: 9000
