@@ -1,0 +1,6 @@
+alloy_env_file_vars:
+  CUSTOM_ARGS: "--server.http.listen-addr=REDACTED_IP:12345"
+alloy_expose_port: true
+
+alloy_metrics_url: https://monitoring.example.com/insert/0/prometheus/api/v1/write
+alloy_logs_url: https://monitoring.example.com/loki/api/v1/push

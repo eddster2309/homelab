@@ -1,0 +1,9 @@
+namespace: openshift-console
+resources: 
+  - ../../../../../bases/openshift-console
+  - ./config
+  - ./secrets
+patches: 
+  - target:
+      kind: HelmRelease
+    path: ./openshift-console-patch.yaml

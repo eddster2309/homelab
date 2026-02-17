@@ -1,0 +1,7 @@
+alloy_extra_config: |
+  prometheus.scrape "garage" {
+    targets = [{"__address__" = "REDACTED_IP:3903", "service" = "garage"}]
+    forward_to = [prometheus.relabel.filter_metrics.receiver]
+    scrape_interval = "60s"
+    bearer_token = "{{ garage_metrics_token }}"
+  }

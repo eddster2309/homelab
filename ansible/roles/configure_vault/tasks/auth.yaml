@@ -1,0 +1,86 @@
+- name: Enable LDAP
+  ansible.builtin.command: vault auth enable ldap
+  changed_when: out.rc == 0
+  failed_when: out.rc != 0 and out.rc != 2
+
+- name: Set ldap config
+  ansible.builtin.command: |
+    vault write auth/ldap/config \
+    url="{{ vault_ldap_url }}" \
+    userattr="{{ vault_ldap_user_attr }}" \
+    groupattr="{{ vault_ldap_group_attr }}" \
+    userdn="{{ vault_ldap_userdn }}" \
+    groupdn="{{ vault_ldap_groupdn }}" \
+    binddn="{{ vault_ldap_binddn }}" \
+    bindpass="{{ vault_ldap_bindpass }}" \
+    certificate="{{ vault_ldap_certificate }}" \
+    starttls="{{ vault_ldap_starttls }}"
+  changed_when: out.rc == 0
+
+- name: Write policy mapping
+  ansible.builtin.command: "vault write auth/ldap/groups/{{ item.ldap_group }} policies={{ item.policy }}"
+  changed_when: false
+  loop: "{{ vault_ldap_policy_mappings }}"
+
+- name: Enable JWT auth
+  ansible.builtin.command: vault auth enable jwt
+  register: out
+  changed_when: out.rc == 0
+  failed_when: out.rc != 0 and out.rc != 2
+
+- name: Configure JWT auth
+  ansible.builtin.command: |
+    vault write auth/jwt/config \
+    oidc_discovery_url="{{ vault_gitlab_url }}" \
+    bound_issuer="{{ vault_gitlab_url }}" \
+    default_role="{{ vault_jwt_default_role }}" \
+  register: out
+  changed_when: out.rc == 0
+  failed_when: out.rc != 0 and out.rc != 2
+
+- name: Create vault JWT roles directory
+  ansible.builtin.file:
+    path: /etc/vault.d/jwt_roles
+    state: directory
+    mode: '0755'
+    owner: "vault"
+    group: "vault"
+
+- name: Template JWT roles
+  ansible.builtin.template:
+    src: jwt_role.hcl.j2
+    dest: "/etc/vault.d/jwt_roles/{{ item.name }}.hcl"
+    mode: "0644"
+    owner: vault
+    group: vault
+  loop: "{{ vault_jwt_roles }}"
+
+- name: Get JWT Roles from disk
+  ansible.builtin.find:
+    paths: /etc/vault.d/jwt_roles
+    patterns: "*.hcl"
+    recurse: true
+    file_type: file
+  register: vault_jwt_roles_disk
+
+- name: Delete old JWT roles from disk
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ vault_jwt_roles_disk.files }}"
+  when: (item.path | basename | splitext | first) not in (vault_jwt_roles | map(attribute='name') | list)
+
+- name: Get JWT Roles from disk
+  ansible.builtin.find:
+    paths: /etc/vault.d/jwt_roles
+    patterns: "*.hcl"
+    recurse: true
+    file_type: file
+  register: vault_jwt_roles_disk
+
+- name: Create JWT roles
+  ansible.builtin.command: |
+    vault write auth/jwt/role/{{ item.path | basename | regex_replace('.hcl', '') }} @{{ item.path }}
+  changed_when: false
+  when: item.path is search('.hcl')
+  loop: "{{ vault_jwt_roles_disk.files }}"

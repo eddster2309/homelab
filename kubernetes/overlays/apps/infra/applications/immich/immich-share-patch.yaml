@@ -1,0 +1,39 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: immich
+spec:
+  values:
+    controllers:
+      main:
+        strategy: Recreate
+        containers:
+          main:
+            image:
+              repository: alangrainger/immich-public-proxy
+              tag: 1.15.3
+              pullPolicy: IfNotPresent
+
+            env:
+              IMMICH_URL: http://immich-server:2283
+
+    service:
+      main:
+        enabled: true
+        primary: true
+        type: ClusterIP
+        ports:
+          http:
+            enabled: true
+            primary: true
+            port: 3000
+            protocol: HTTP
+
+    ingress:
+      main:
+        enabled: true
+        hosts:
+          - host: immich.example.com
+            paths:
+              - path: "/share/"
+                pathType: Prefix

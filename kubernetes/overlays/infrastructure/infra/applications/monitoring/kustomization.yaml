@@ -1,0 +1,21 @@
+namespace: monitoring
+resources: 
+- ./secrets
+- ../../../../../bases/monitoring
+- ./dashboards
+- ./datasources
+- ./scrape_configs
+patches: 
+  - target: 
+      kind: HelmRelease
+      name: vicmetrics
+    path: ./vic-metrics-patch.yaml
+  - target:
+      kind: HelmRelease
+      name: loki
+    path: ./loki-patch.yaml
+  - target:
+      kind: HelmRelease
+      name: k8s-monitoring
+    path: ./k8s-monitoring-patch.yaml
+

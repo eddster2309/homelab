@@ -1,0 +1,7 @@
+- name: Configure frigate
+  hosts: frigate
+  become: true
+  vars_files:
+    - vars/frigate.yaml
+  roles:
+    - role: install_frigate

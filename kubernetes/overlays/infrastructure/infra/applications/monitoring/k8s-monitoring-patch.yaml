@@ -1,0 +1,28 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: alloy
+  namespace: monitoring
+spec:
+  chart:
+    spec:
+      version: "3.7.2"
+  values:
+    cluster:
+      name: rke-alloy
+    destinations:
+    - name: localLoki
+      type: loki
+      url: http://loki-gateway.monitoring.svc.cluster.local:80/loki/api/v1/push
+    clusterEvents:
+      enabled: true
+    nodeLogs:
+      enabled: true
+    podLogs:
+      enabled: true
+    selfReporting:
+      enabled: true
+    alloy-singleton:
+      enabled: true
+    alloy-logs:
+      enabled: true

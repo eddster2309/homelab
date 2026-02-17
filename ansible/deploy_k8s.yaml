@@ -1,0 +1,95 @@
+- name: Deploy K3s
+  hosts: bare_metal_kubernetes
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/k8s.yaml
+  tasks:
+    - name: Install node requirements
+      ansible.builtin.package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - cryptsetup
+        - open-iscsi
+
+    - name: Enable dm_crypt kernel module
+      community.general.modprobe:
+        name: dm_crypt
+        state: present
+        persistent: present
+
+    # - name: Disbable predictable network interface names
+    #   ansible.builtin.lineinfile:
+    #     regexp: "^GRUB_CMDLINE_LINUX="
+    #     line: GRUB_CMDLINE_LINUX="net.ifnames=0 biosdevname=0"
+    #     path: /etc/default/grub
+    #   register: grub_updated
+
+    # - name: Update GRUB configuration
+    #   ansible.builtin.command:
+    #     cmd: update-grub
+    #   become: true
+    #   # when: grub_updated.changed
+
+    # - name: Restart System
+    #   ansible.builtin.reboot:
+    #     msg: "Rebooting to apply changes"
+    #     connect_timeout: 5
+    #     reboot_timeout: 600
+    #   # when: grub_updated.changed
+
+    # - name: Gather facts after reboot
+    #   ansible.builtin.setup:
+    #   # when: grub_updated.changed
+
+    - name: Deploy RKE2
+      ansible.builtin.include_role:
+        name: lablabs.rke2
+
+- name: Install/Upgrade Flux
+  hosts: localhost
+  vars_files:
+    - vars/k8s.yaml
+  tasks:
+    - name: Get latest Flux version
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/fluxcd/flux2/releases/latest
+        return_content: true
+      register: flux_latest
+
+    - name: Check if Flux is installed
+      ansible.builtin.stat:
+        path: /usr/local/bin/flux
+      register: flux_installed
+
+    - name: Check current Flux version
+      ansible.builtin.shell: |-
+        set -o pipefail
+        flux --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+'
+      register: flux_current
+      changed_when: false
+      when: flux_installed.stat.exists
+
+    - name: Install Flux
+      become: true
+      ansible.builtin.unarchive:
+        src: "https://github.com/fluxcd/flux2/releases/download/{{ flux_latest.json.tag_name }}/flux_{{ flux_latest.json.tag_name | regex_replace('^v', '') }}_linux_amd64.tar.gz" # noqa: yaml[line-length]
+        dest: /usr/local/bin
+        remote_src: true
+      when: not flux_installed.stat.exists or flux_current.stdout != flux_latest.json.tag_name | regex_replace('^v', '')
+
+    - name: Bootstrap Flux
+      environment:
+        GITHUB_TOKEN: "{{ flux_github_pat }}"
+      ansible.builtin.command: |-
+        flux bootstrap github \
+          --components-extra=image-reflector-controller,image-automation-controller \
+          --owner={{ flux_repo_namespace }} \
+          --repository={{ flux_repo_name }} \
+          --branch=main \
+          --path={{ flux_repo_path }} \
+          --personal \
+          --token-auth \
+          --kubeconfig={{ rke2_download_kubeconf_path }}/{{ rke2_download_kubeconf_file_name }}
+      changed_when: false

@@ -1,0 +1,7 @@
+namespace: csi-driver-nfs
+resources:
+  - ../../../../../bases/csi-driver-nfs
+patches: 
+  - target:
+      kind: HelmRelease
+    path: ./csi-driver-nfs-patch.yaml

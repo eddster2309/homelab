@@ -1,0 +1,127 @@
+---
+# tasks file for configure_repos
+- name: Get all enabled repos
+  ansible.builtin.command: dnf repolist --enabled --json
+  register: out
+  changed_when: false
+
+- name: Disable all repos
+  ansible.builtin.command: dnf config-manager setopt {{ item.id }}.enabled=0
+  changed_when: false
+  loop: "{{ out.stdout | from_json }}"
+
+- name: Enable fedora and fedora-updates repo
+  ansible.builtin.command: dnf config-manager setopt {{ item }}.enabled=1
+  changed_when: false
+  loop:
+    - fedora
+    - updates
+
+- name: Install Nginx
+  ansible.builtin.package:
+    name: nginx
+    state: present
+
+- name: Create cache dir
+  ansible.builtin.file:
+    path: "{{ configure_repos_cache_root }}"
+    state: directory
+    owner: nginx
+    group: nginx
+    mode: "0755"
+  notify: Restart nginx
+
+- name: Create log dir
+  ansible.builtin.file:
+    path: "{{ configure_repos_log_root }}"
+    state: directory
+    owner: nginx
+    group: nginx
+    mode: "0755"
+  notify: Restart nginx
+
+- name: Create vHosts dir
+  ansible.builtin.file:
+    path: "{{ configure_repos_vhosts_root }}"
+    state: directory
+    owner: nginx
+    group: nginx
+    mode: "0755"
+  notify: Restart nginx
+
+- name: Provide adm access to log dir
+  ansible.posix.acl:
+    path: "{{ configure_repos_log_root }}"
+    entity: adm
+    etype: group
+    permissions: r
+    state: present
+    follow: true
+  notify: Restart nginx
+
+- name: Template nginx.conf
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/nginx.conf
+    owner: nginx
+    group: nginx
+    mode: "0644"
+  notify: Restart nginx
+
+- name: Template general_cache.conf
+  ansible.builtin.template:
+    src: general_cache.conf.j2
+    dest: /etc/nginx/default.d/general_cache.conf
+    owner: nginx
+    group: nginx
+    mode: "0644"
+  notify: Restart nginx
+
+- name: Template index.html
+  ansible.builtin.template:
+    src: index.html.j2
+    dest: /usr/share/nginx/html/index.html
+    owner: nginx
+    group: nginx
+    mode: "0644"
+
+- name: Template vhost.conf
+  ansible.builtin.template:
+    src: vhost.conf.j2
+    dest: "{{ configure_repos_vhosts_root }}/{{ item.name }}.conf"
+    owner: nginx
+    group: nginx
+    mode: "0644"
+  loop: "{{ configure_repos_mirrors }}"
+  notify: Restart nginx
+
+- name: Allow nginx to access cache
+  ansible.posix.acl:
+    path: "{{ configure_repos_cache_root }}"
+    entity: nginx
+    etype: user
+    permissions: rwx
+    state: present
+    follow: true
+
+- name: Allow nginx to cache
+  ansible.posix.seboolean:
+    name: httpd_can_network_connect
+    state: true
+    persistent: true
+
+- name: Enable and start nginx
+  ansible.builtin.service:
+    name: nginx
+    state: started
+    enabled: true
+
+- name: Configure firewalld
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - http
+    - https

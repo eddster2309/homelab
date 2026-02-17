@@ -1,0 +1,48 @@
+distspecversion: 1.1.1
+http:
+  address: REDACTED_IP
+  auth:
+    faildelay: 5
+{% if zot_user_accounts is defined and zot_user_accounts | length > 0 %}
+    htpasswd:
+      path: "{{ zot_config_directory }}/htpasswd"
+{% endif %}
+  port: {{ zot_port }}
+  realm: zot
+  tls:
+    cert: "{{ zot_ssl_cert_path}}"
+    key: "{{ zot_ssl_key_path }}"
+{% if zot_access_control | length > 0 %}
+  accessControl:
+    repositories:
+{% for access_control in zot_access_control %}
+      {{ access_control.path }}:
+        anonymousPolicy:
+          {{ access_control.anonymous | to_nice_yaml(indent=2) | indent(width=10) }}
+{% endfor %}
+{% endif %}
+log:
+  audit: "{{ zot_log_directory }}/zot-audit.log"
+  level: "{{ zot_log_level }}"
+  output: "{{ zot_log_directory }}/zot.log"
+storage:
+  rootdirectory: "{{ zot_storage_directory }}"
+extensions:
+  ui:
+    enable: {{ zot_ui_enabled | bool | lower}}
+  search:
+    enable: {{ zot_ui_enabled | bool | lower}}
+    cve:
+      updateInterval: 4h
+{% if zot_registry_sync | length > 0 %}
+  sync:
+    enable: {{ (zot_registry_sync | length > 0) | bool | lower }}
+    registries:
+{% for registry in zot_registry_sync %}
+      - content:
+          {{ registry.content | to_nice_yaml(indent=2) | indent(width=10) }}
+        onDemand: {{ registry.onDemand | bool | lower }}
+        tlsVerify: {{ registry.tlsVerify | bool | lower }}
+{% endfor %}
+{% endif %}
+

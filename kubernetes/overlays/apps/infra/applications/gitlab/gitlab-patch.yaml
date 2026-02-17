@@ -1,0 +1,208 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: gitlab
+  namespace: gitlab
+spec:
+  chart:
+    spec:
+      version: "9.8.0"
+  values: 
+    registry:
+      enabled: true
+      storage:
+        secret: registry-storage-config
+        key: config
+        redirect:
+          disable: true
+      ingress:
+        proxyBodySize: 8196m
+    gitlab-runner:
+      certsSecretName: ipa-ca
+      volumes:
+        - name: ca-bundle
+          configMap:
+            name: ipa-ca
+      volumeMounts:
+        - name: ca-bundle
+          mountPath: /etc/ssl/certs/ca-certificates.crt
+          subPath: ca-certificates.crt
+          readOnly: false
+      runners:
+        config: |
+          [[runners]]
+            [runners.kubernetes]
+              image = "ubuntu:22.04"
+              privileged = true
+    monitoring:
+      exporter:
+        enabled: true
+    gitlab:
+      toolbox:
+        extraEnvFrom:
+          AWS_ACCESS_KEY_ID:
+            secretKeyRef:
+              name: s3-creds
+              key: ACCESS_KEY_ID
+          AWS_SECRET_ACCESS_KEY:
+            secretKeyRef:
+              name: s3-creds
+              key: ACCESS_SECRET_KEY
+        extraEnv:
+          AWS_DEFAULT_REGION: us-east-1
+          # Certificate mounted using global.certificates.customCAs
+          AWS_CA_BUNDLE: "/etc/ssl/certs/ca-certificates.crt"
+        backups:
+          objectStorage:
+            config:
+              secret: object-store-config
+              key: config
+          cron:
+            enabled: true
+            schedule: "@daily"
+            extraArgs: "--s3tool awscli --aws-s3-endpoint-url https://s3.example.com --skip registry --skip artifacts --skip packages --skip lfs --maximum-backups 3"
+      sidekiq:
+        concurrency: 10
+      webservice:
+        ingress:
+          proxyBodySize: 8196m
+        puma:
+          threads:
+            min: 1
+            max: 2
+        trusted_proxies:
+          - "REDACTED_IP/16"
+    global:
+      edition: ee
+      registry:
+        storage:
+          secret: registry-storage-config
+          key: config
+          redirect:
+            disable: true
+      shell:
+        port: 222
+      hosts:
+        domain: example.com
+        gitlab:
+          name: gitlab.example.com
+          https: true
+        registry:
+          name: gitlab-registry.example.com
+          https: true
+        ssh: gitlab.example.com
+      kas:
+        enabled: false
+      ingress:
+        enabled: true
+        class: "nginx"
+        configureCertmanager: false
+        proxyBodySize: 8192m
+        annotations:
+          nginx.ingress.kubernetes.io/whitelist-source-range: "REDACTED_IP/0"
+      certificates:
+        customCAs:
+          - configMap: ipa-ca
+      psql:
+        host: gitlab-db-rw
+        password:
+          secret: gitlab-db-app
+          key: password
+        username: app
+        database: app
+      appConfig:
+        enableUsagePing: false
+        defaultTheme: 2
+        defaultColorMode: 2
+        omniauth:
+          enabled: true
+          autoSignInWithProvider: "openid_connect"
+          allowSingleSignOn: ["openid_connect"]
+          blockAutoCreatedUsers: false
+          autoLinkUser: ["openid_connect"]
+          syncProfileAttributes: ["name", "email"]
+          syncProfileFromProvider: ["openid_connect"]
+          allowBypassTwoFactor: true
+          providers:
+            - secret: gitlab-oauth-secret
+              key: config
+        lfs:
+          enabled: true
+          bucket: rke-gitlab-lfs
+          connection:
+            secret: object-store-config
+            key: config
+        artifacts:
+          enabled: true
+          bucket: rke-gitlab-artifacts
+          proxy_download: true
+          connection:
+            secret: object-store-config
+            key: config
+        uploads:
+          enabled: true
+          bucket: rke-gitlab-uploads
+          connection:
+            secret: object-store-config
+            key: config
+        packages:
+          enabled: true
+          bucket: rke-gitlab-packages
+          connection:
+            secret: object-store-config
+            key: config
+        backups:
+          bucket: rke-gitlab-backups
+          tmpBucket: rke-gitlab-tmp
+      minio:
+        enabled: false
+      email:
+        display_name: "Eddster GitLab"
+        from: "gitlab-noreply@example.com"
+        reply_to: "support@example.com"
+      smtp:
+        enabled: true
+        address: "smtp.example.com"
+        tls: true
+        port: 465
+        authenication: "plain"
+        user_name: rke-eddster-gitlab
+        password:
+          secret: smtp-secret
+          key: secret
+      pages:
+        enabled: true
+        accessControl: true
+        host: pages.example.com
+        objectStore:
+          enabled: true
+          bucket: rke-gitlab-pages
+          connection:
+            secret: object-store-config
+            key: config
+        apiSeret:
+          secret: pages-secret
+          key: secret
+    installCertmanager: false
+    certmanager:
+      installCRDs: true
+    postgresql:
+      install: false
+    nginx-ingress:
+      enabled: false
+    prometheus:
+      install: false
+    pages:
+      metrics:
+        enabled: true
+        serviceMonitor:
+          enabled: true
+          additionalLabels:
+            app: gitlab-pages
+      ingress:
+        enabled: true
+        className: nginx
+        hostName: pages.example.com
+        tls:
+          secretName: gitlab-pages-tls
+        proxyBodySize: 8196m

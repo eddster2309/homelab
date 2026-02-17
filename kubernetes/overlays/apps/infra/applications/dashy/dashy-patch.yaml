@@ -1,0 +1,172 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: dashy
+spec:
+  values:
+    replicaCount: 2
+    ingress:
+      enabled: true
+      hosts:
+        - host: dashy.example.com
+          paths:
+            - path: /
+              pathType: ImplementationSpecific
+      annotations:
+        nginx.ingress.kubernetes.io/whitelist-source-range: "REDACTED_IP/0"
+        nginx.ingress.kubernetes.io/cors-allow-origin: "https://dashy.example.com https://auth.example.com"
+    podAnnotations:
+      reloader.stakater.com/auto: "true"
+    static:
+      configMapContent:
+        conf: |-
+          pageInfo:
+            title: "Eddster Homelab"
+            navLinks:
+              - title: "Homelab Repo"
+                url: "https://github.com/eddster2309/homelab-infra"
+          appConfig:
+            hideComponents:
+              hideNav: true
+              hideSearch: true
+              hideSettings: true
+              hideFooter: true
+            disableConfiguration: true
+            preventLocalSave: true
+            preventWriteToDisk: true
+            disableContextMenu: true
+            auth:
+              enableOidc: true
+              oidc:
+                clientId: "dashy"
+                endpoint: "https://auth.example.com"
+                scopes:
+                  - openid
+                  - profile
+                  - groups
+                  - email
+          sections:
+            - name: "Apps"
+              items:
+                - title: "Coder"
+                  type: "link"
+                  url: "https://coder.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/visual-studio-code-dark.svg"
+                  displayData:
+                    showForKeycloakUsers:
+                      groups: ["k8s_coder_access"]
+                - title: "Paperless-ngx"
+                  type: "link"
+                  url: "https://paperless.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/paperless-ngx.svg"
+                  displayData:
+                    showForKeycloakUsers:
+                      groups: ["k8s-paperless-basic-user", "k8s-paperless-admin"]
+                - title: "GitLab"
+                  type: "link"
+                  url: "https://gitlab.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/gitlab.svg"
+                  displayData:
+                    showForKeycloakUsers:
+                      groups: ["k8s-infra-gitlab-users"]
+                - title: "Immich"
+                  type: "link"
+                  url: "https://immich.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/immich.svg"
+                - title: "Mealie"
+                  type: "link"
+                  url: "https://mealie.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/mealie.svg"
+                  displayData:
+                    showForKeycloakUsers:
+                      groups: ["k8s-mealie-access"]
+                - title: "Karakeep"
+                  type: "link"
+                  url: "https://karakeep.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/karakeep.svg"
+                  displayData:
+                    showForKeycloakUsers:
+                      groups: ["k8s-karakeep-access"]
+                - title: "Home Assistant"
+                  type: "link"
+                  url: "https://home.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/home-assistant.svg"
+                - title: Frigate
+                  type: "link"
+                  url: "https://cctv.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/frigate.svg"
+                  displayData:
+                    showForKeycloakUsers:
+                      groups: ["k8s-cctv-access"]
+            - name: "Monitoring"
+              items:
+                - title: "Grafana"
+                  type: "link"
+                  url: "https://grafana.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/grafana.svg"
+                  displayData:
+                    showForKeycloakUsers:
+                      groups: ["k8s-grafana-access"]
+                - title: "Victoria Metrics"
+                  type: "link"
+                  url: "https://vm-agent.example.com/"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/victoriametrics.svg"
+                  displayData:
+                    showForKeycloakUsers:
+                      groups: ["k8s-monitor-vm-agent-access"]
+            - name: Kubernetes Management
+              displayData:
+                showForKeycloakUsers:
+                  groups: ["k8s-infra-admins", "k8s-infra-longhorn-access", "k8s-infra-cilium-access"]
+              items:
+                - title: "Headlamp"
+                  type: "link"
+                  url: "https://headlamp.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/headlamp.svg"
+                  displayData:
+                    showForKeycloakUsers:
+                      groups: ["k8s-infra-admins"]
+                - title: "Longhorn"
+                  type: "link"
+                  url: "https://longhorn.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/longhorn.svg"
+                  displayData:
+                    showForKeycloakUsers:
+                      groups: ["k8s-infra-longhorn-access"]
+                - title: "Cilium"
+                  type: "link"
+                  url: "https://cilium.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/cilium.svg"
+                  displayData:
+                    showForKeycloakUsers:
+                      groups: ["k8s-infra-cilium-access"]
+            - name: Network and Hardware Management
+              items:
+                - title: Proxmox VE
+                  type: "link"
+                  url: "https://REDACTED_IP:8006"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/proxmox.svg"
+                - title: Omada
+                  type: "link"
+                  url: "https://REDACTED_IP"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/tp-link-omada.svg"
+                - title: OPNSense
+                  type: "link"
+                  url: "https://REDACTED_IP"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/opnsense.svg"
+                - title: IPA1
+                  type: "link"
+                  url: "http://ipa01.example.com/ipa/ui/"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/freeipa.svg"
+                - title: TrueNAS
+                  type: "link"
+                  url: "https://REDACTED_IP"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/truenas.svg"
+                - title: Vault
+                  type: "link"
+                  url: "https://vault01.infra.internal"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/hashicorp-vault.svg"
+                  displayData:
+                    showForKeycloakUsers:
+                      groups: ["vault-admins"]
+

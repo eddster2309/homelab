@@ -1,0 +1,19 @@
+---
+# tasks file for configure_devbox
+- name: Install requirements
+  ansible.builtin.include_tasks: install_requirements.yaml
+
+- name: Configure dotfiles
+  ansible.builtin.include_tasks: configure_dotfiles.yaml
+
+- name: Install RDP
+  ansible.builtin.include_role:
+    name: "{{ item }}"
+  loop:
+    - robertdebock.bootstrap
+    - robertdebock.core_dependencies
+    - robertdebock.epel
+    - robertdebock.xrdp
+
+- name: Configure Desktop
+  ansible.builtin.include_tasks: configure_desktop.yaml

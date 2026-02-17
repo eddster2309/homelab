@@ -1,0 +1,60 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: pve-tag-proxy
+spec:
+  values:
+    controllers:
+      pve-tag-proxy:
+        replicas: 2
+        containers:
+          app:
+            env:
+              PMTP_CONFIG_FILE_PATH: /config/config.yaml
+              PMTP_API_TOKEN_ID:
+                valueFrom:
+                  secretKeyRef:
+                    name: pve-secret
+                    key: id
+              PMTP_API_TOKEN_SECRET:
+                valueFrom:
+                  secretKeyRef:
+                    name: pve-secret
+                    key: secret
+    persistence:
+      config:
+        enabled: true
+        type: configMap
+        name: pve-tag-proxy
+    configMaps:
+      config:
+        enabled: true
+        data:
+          config.yaml: |-
+            api_url: REDACTED_IP:8006
+            network_mapping:
+              dmz: dmz.internal
+              services: svc.internal
+              infcore: infra.internal
+              kube: kube.internal
+    ingress:
+      app:
+        className: nginx
+        annotations:
+          nginx.ingress.kubernetes.io/proxy-body-size: 20m
+          nginx.ingress.kubernetes.io/whitelist-source-range: "REDACTED_IP/16,REDACTED_IP/16"
+        hosts:
+          - host: pve-tag-proxy.example.com
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: 5000
+          - host: pve-tag-proxy.example.com
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: 5000

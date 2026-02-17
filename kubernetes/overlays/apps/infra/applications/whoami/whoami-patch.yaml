@@ -1,0 +1,18 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: whoami
+spec:
+  chart:
+    spec:
+      version: "6.0.0"
+  values:
+    ingress:
+      enabled: true
+      ingressClassName: "nginx"
+      annotations:
+          nginx.ingress.kubernetes.io/whitelist-source-range: "REDACTED_IP/0"
+      hosts:
+        - host: whoami.example.com
+          paths:
+            - /

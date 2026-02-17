@@ -1,0 +1,60 @@
+access_control:
+  default_policy: 'deny'
+  networks:
+  - name: 'internal'
+    networks:
+    - 'REDACTED_IP/8'
+    - 'REDACTED_IP/12'
+    - 'REDACTED_IP/16'
+  - name: 'core'
+    networks:
+    - 'REDACTED_IP/24'
+  rules:
+  - domain: 'longhorn.example.com'
+    policy: 'one_factor'
+    networks:
+    - 'internal'
+    subject:
+    - ['group:k8s-infra-longhorn-access']
+  - domain: 'cilium.example.com'
+    policy: 'one_factor'
+    networks:
+    - 'internal'
+    subject:
+    - ['group:k8s-infra-cilium-access']
+  - domain: 'cctv.example.com'
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-cctv-access']
+    networks:
+    - 'internal'
+  - domain: "console.example.com"
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-console-access']
+    networks:
+    - 'internal'
+  - domain: 'vm-agent.example.com'
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-monitor-vm-agent-access']
+    networks:
+    - 'internal'
+  - domain: 'grafana.example.com'
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-grafana-access']
+    networks:
+    - 'internal'
+  - domain: 'coder.example.com'
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-coder-access']
+    networks:
+    - 'internal'
+  - domain: 'headlamp.example.com'
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-headlamp-access']
+    networks:
+    - 'internal'

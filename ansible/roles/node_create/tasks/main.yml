@@ -1,0 +1,76 @@
+---
+- name: Add ipajoined to tags if vm_ipa_joined is true
+  ansible.builtin.set_fact:
+    vm_tags: "{{ (vm_tags | default([])) + ['ipajoined'] }}"
+  when: vm_ipa_joined
+
+- name: Join VM tags
+  ansible.builtin.set_fact:
+    vm_tags: "{{ vm_tags | default([]) | join(',') }}"
+
+- name: Add , to front of vm_tags
+  ansible.builtin.set_fact:
+    vm_tags: ",{{ vm_tags }}"
+  when: vm_tags | length > 0
+
+- name: Remove tfstate
+  ansible.builtin.file:
+    path: "{{ role_path }}/files/terraform/.terraform/terraform.tfstate"
+    state: absent
+
+- name: Deploy VMs on proxmox for {{ service_name }}
+  community.general.terraform:
+    project_path: "{{ role_path }}/files/terraform"
+    state: "{{ tf_state | default('present') }}"
+    complex_vars: true
+    check_destroy: "{{ tf_state_check_destroy | default(true) }}"
+    backend_config:
+      bucket: "{{ tf_state_bucket }}"
+      key: "ans_{{ service_name }}.tfstate"
+      region: "{{ tf_state_region }}"
+      access_key: "{{ tf_state_access_key }}"
+      secret_key: "{{ tf_state_secret_key }}"
+      skip_credentials_validation: "true"
+      skip_region_validation: "true"
+      skip_requesting_account_id: "true"
+      skip_metadata_api_check: "true"
+      skip_s3_checksum: "true"
+    force_init: true
+    variables:
+      dns_server: "{{ dns_server }}"
+      search_domain: "{{ dns_search_domain }}"
+      proxmox_host: "{{ proxmox_host }}"
+      proxmox_user: "{{ proxmox_user }}"
+      proxmox_password: "{{ proxmox_password }}"
+      proxmox_datastore_id: "{{ proxmox_datastore_id }}"
+      # vm_user: "{{ ansible_user }}"
+      # vm_user_ssh_key: "{{ ssh_pub_key }}"
+      vm_template_id: "{{ vm_template_id }}"
+      proxmox_node_name: "{{ proxmox_node_name }}"
+      vm_count: "{{ vm_count }}"
+      vm_cpu_core_count: "{{ vm_cpu_core_count }}"
+      vm_memory: "{{ vm_memory }}"
+      vm_disk_size: "{{ vm_disk_size }}"
+      service_name: "{{ service_name }}"
+      vm_net_bridge: "{{ vm_net_bridge }}"
+      vm_start_ip: "{{ vm_start_ip }}"
+      vm_network_subnet: "{{ vm_network_subnet }}"
+      vm_ip_gateway: "{{ vm_ip_gateway }}"
+      vm_network_mask: "{{ vm_network_mask }}"
+      tags: "{{ vm_tags }}"
+  environment:
+    AWS_ENDPOINT_URL_S3: "{{ tf_state_s3_endpoint_url }}"
+  register: tf_state
+
+- name: Remove tfstate
+  ansible.builtin.file:
+    path: "{{ role_path }}/files/terraform/.terraform/terraform.tfstate"
+    state: absent
+
+- name: Wait for VMs to come up
+  ansible.builtin.pause:
+    seconds: 150
+  when: tf_state.changed # noqa: no-handler
+
+- name: Refresh inventory
+  ansible.builtin.meta: refresh_inventory

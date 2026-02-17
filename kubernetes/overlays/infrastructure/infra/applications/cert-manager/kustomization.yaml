@@ -1,0 +1,17 @@
+namespace: cert-manager
+resources: 
+  - ../../../../../bases/cert-manager
+  - ./secrets
+components:
+  - ../../../../../components/ca-certs/
+patches: 
+  - target: 
+      kind: HelmRelease
+    path: cert-manager-patch.yaml
+  - target:
+      kind: Namespace
+    patch: |
+      - op: add
+        path: /metadata/labels
+        value:
+          app: cert-manager

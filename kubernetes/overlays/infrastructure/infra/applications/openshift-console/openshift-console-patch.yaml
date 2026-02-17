@@ -1,0 +1,51 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: openshift-console
+  namespace: openshift-console
+spec:
+  chart:
+    spec:
+      version: "0.3.17"
+  values: 
+    ingress: 
+      enabled: true 
+      className: nginx
+      annotations:
+        nginx.ingress.kubernetes.io/auth-method: 'GET'
+        nginx.ingress.kubernetes.io/auth-signin: "https://auth.example.com?rm=$request_method"
+        nginx.ingress.kubernetes.io/auth-url: "http://authelia.authelia.svc.cluster.local/api/authz/auth-request"
+      hosts: 
+        - host: console.example.com
+          paths: 
+            - path: / 
+    extraEnv: 
+      - name: BRIDGE_USER_AUTH_OIDC_CLIENT_SECRET
+        valueFrom: 
+          secretKeyRef: 
+            name: oidc-secret
+            key: KUBELOGIN_CLIENT_SECRET
+      - name: BRIDGE_CUSTOM_LOGO_FILE
+        value: /opt/bridge/static/assets/k8s-logo.png
+    console: 
+      dex: 
+        host: "https://auth.example.com"
+      baseUrl: https://console.example.com
+      impersonateOpenShift: true
+      oidc: 
+        enabled: true
+        issuerUrl: https://auth.example.com
+        clientId: kubelogin
+    volumes: 
+      - name: logo 
+        mountPath: /opt/bridge/static/assets/k8s-logo.png
+        config: 
+          configMap: 
+            name: logo
+        subPath: k8s-logo.png
+      - name: favicon
+        mountPath: /opt/bridge/static/assets/okd-favicon.png
+        config: 
+          configMap: 
+            name: favicon
+        subPath: okd-favicon.png

@@ -1,0 +1,40 @@
+- name: Create Wallpaper dir
+  ansible.builtin.file:
+    path: /usr/share/backgrounds/wallpapers
+    state: directory
+    mode: "0644"
+    owner: root
+    group: root
+
+- name: Copy wallpaper
+  ansible.builtin.copy:
+    src: ManagementNetWallpaper.jpg
+    dest: /usr/share/backgrounds/wallpapers/ManagementNetWallpaper.jpg
+    mode: "0644"
+    owner: root
+    group: root
+
+- name: Set wallpaper
+  community.general.dconf:
+    key: "/org/gnome/desktop/background/picture-uri"
+    value: "'file:///usr/share/backgrounds/wallpapers/ManagementNetWallpaper.jpg'"
+
+- name: Set wallpaper mode
+  community.general.dconf:
+    key: "/org/gnome/desktop/background/picture-options"
+    value: "'zoom'"
+
+- name: Automatic timezone
+  community.general.dconf:
+    key: "/org/gnome/desktop/datetime/automatic-timezone"
+    value: "true"
+
+- name: Clock show date
+  community.general.dconf:
+    key: "/org/gnome/desktop/interface/clock-show-date"
+    value: "true"
+
+- name: Clock format
+  community.general.dconf:
+    key: "/org/gnome/desktop/interface/clock-format"
+    value: "'12h'"

@@ -1,0 +1,39 @@
+ansible_user: cloud-user
+
+# RKE2 Variables
+rke2_ha_mode: true
+rke2_ha_mode_keepalived: false
+rke2_ha_mode_kubevip: true
+rke2_api_ip: REDACTED_IP
+rke2_kubevip_cloud_provider_enable: false
+rke2_kubevip_svc_enable: false
+rke2_version: v1.33.1+rke2r1
+rke2_custom_manifests:
+  - templates/k8s/rke2-cilium-config.yaml
+  - templates/k8s/external-secrets/namespace.yaml
+  - templates/k8s/external-secrets/vault-secret.yaml
+rke2_cni:
+  - multus
+  - cilium
+disable_kube_proxy: true
+rke2_selinux: false
+rke2_disable:
+  - rke2-metrics-server
+  - rke2-ingress-nginx
+rke2_cluster_group_name: bare_metal_kubernetes
+rke2_servers_group_name: bare_metal_kubernetes
+rke2_agents_group_name: bare_metal_kubernetes
+rke2_download_kubeconf: true
+rke2_download_kubeconf_path: /home/jack/.kube
+rke2_download_kubeconf_file_name: rke2-kubeconfig.yaml
+
+rke2_kube_apiserver_args:
+  - --oidc-client-id=kubelogin
+  - --oidc-groups-claim=groups
+  - --oidc-issuer-url=https://auth.example.com
+  - --oidc-username-claim=email
+
+# Flux GitOps
+flux_repo_namespace: eddster2309
+flux_repo_name: homelab-infra
+flux_repo_path: kubernetes/clusters/infra

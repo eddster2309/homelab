@@ -1,0 +1,35 @@
+- name: Create required directories
+  ansible.builtin.file:
+    name: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ install_frigate_storage_path }}"
+    - "{{ install_frigate_config_path }}"
+
+- name: Place Frigate Docker Compose file
+  ansible.builtin.template:
+    src: frigate_docker_compose.yml.j2
+    dest: "{{ install_frigate_config_path }}/docker-compose.yml"
+    mode: '0644'
+    owner: root
+    group: root
+
+- name: Place Frigate configuration file
+  ansible.builtin.template:
+    src: frigate_config.yml.j2
+    dest: "{{ install_frigate_config_path }}/config.yml"
+    mode: '0644'
+    owner: root
+    group: root
+  notify: Restart Frigate
+
+- name: Start Frigate using Docker Compose
+  ansible.builtin.command:
+    cmd: "docker compose -f {{ install_frigate_config_path }}/docker-compose.yml up -d"
+  args:
+    chdir: "{{ install_frigate_config_path }}"
+  register: frigate_start_result
+  changed_when: frigate_start_result.rc == 0

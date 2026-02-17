@@ -1,0 +1,33 @@
+namespace: authelia
+resources: 
+  - ../../../../../bases/authelia
+  - database/
+  - secrets/
+  - network-policies/
+components:
+  - ../../../../../components/ca-certs/
+  - ../../../../../components/network-policies/
+patches: 
+  - target: 
+      kind: HelmRelease
+    path: authelia-patch.yaml
+  - target:
+      kind: SecretStore
+      name: k8s-store
+    patch: |
+      - op: add
+        path: /spec/provider/kubernetes/remoteNamespace
+        value: authelia
+
+configMapGenerator:
+  - name: ldap-config
+    files:
+      - config/config.ldap.yaml
+  - name: oidc-config
+    files:
+      - config/config.oidc.yaml
+  - name: acl-config
+    files:
+      - config/config.acl.yaml
+generatorOptions:
+  disableNameSuffixHash: true

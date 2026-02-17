@@ -1,0 +1,8 @@
+resources:
+  - allow-dns.yaml
+  - allow-ingress-nginx.yaml
+  - allow-internal-ingress.yaml
+  - allow-ldaps.yaml
+  - allow-smtp.yaml
+  - default-deny-egress.yaml
+  - allow-cnpg-egress.yaml

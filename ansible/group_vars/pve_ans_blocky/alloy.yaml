@@ -1,0 +1,6 @@
+alloy_extra_config: |
+  prometheus.scrape "blocky" {
+    targets = [{"__address__" = "REDACTED_IP:4000", "service" = "blocky"}]
+    forward_to = [prometheus.relabel.filter_metrics.receiver]
+    scrape_interval = "60s"
+  }

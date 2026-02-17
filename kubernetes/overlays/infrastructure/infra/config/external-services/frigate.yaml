@@ -1,0 +1,59 @@
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: external-service-frigate
+  labels:
+    kubernetes.io/service-name: external-service-frigate # Must be present for EndpointSlice and equal to Service name for automatic mapping - with having it in place, you can change the name of EndpointSlice to something else. The official convention is using Service name as the prefix.
+addressType: IPv4
+ports:
+  - port: 5000
+    name: http
+    protocol: TCP
+  - port: 8554
+    name: rtsp
+    protocol: TCP
+endpoints:
+  - addresses:
+    - "REDACTED_IP"
+    conditions:
+      ready: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-service-frigate
+spec:
+  ports:
+    - port: 5000
+      protocol: TCP
+      targetPort: 5000
+      name: http
+    - port: 8554
+      protocol: TCP
+      targetPort: 8554
+      name: rtsp
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: external-service-frigate
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/auth-method: 'GET'
+    nginx.ingress.kubernetes.io/auth-signin: "https://auth.example.com?rm=$request_method"
+    nginx.ingress.kubernetes.io/auth-url: "http://authelia.authelia.svc.cluster.local/api/authz/auth-request"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: cctv.example.com
+      http:
+        paths:
+        - backend:
+            service:
+              name: external-service-frigate
+              port:
+                number: 5000
+          path: /
+          pathType: ImplementationSpecific

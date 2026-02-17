@@ -1,0 +1,17 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: whoami
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  path: ./kubernetes/overlays/apps/infra/applications/whoami
+  healthChecks:
+    - kind: HelmRelease
+      name: whoami
+      namespace: whoami
+      apiVersion: helm.toolkit.fluxcd.io/v2beta1
+  prune: true
+  sourceRef:
+    kind: "GitRepository"
+    name: "flux-system"

@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: coder
+resources:
+- ../../../../../bases/coder
+- postgres.yaml
+- oidc-secret.yaml
+- gitlab-secret.yaml
+components:
+- ../../../../../components/ca-certs
+patches:
+- target:
+    kind: HelmRelease
+  path: coder-patch.yaml

@@ -1,0 +1,80 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: freshrss
+spec:
+  values:
+    controllers:
+      freshrss:
+        replicas: 1
+        containers:
+          app:
+            securityContext:
+              readOnlyRootFilesystem: false
+              runAsNonRoot: false
+              runAsUser: 0
+              runAsGroup: 0
+            envFrom:
+              - secretRef:
+                  name: config-secret
+            env:
+              BASE_URL: https://freshrss.example.com
+              SERVER_DNS: freshrss.example.com
+              TZ: Australia/Sydney
+              CRON_MIN: '3,33'
+              TRUSTED_PROXIES: REDACTED_IP/16
+              OIDC_ENABLED: 1
+              OIDC_PROVIDER_METADATA_URL: https://auth.example.com/.well-known/openid-configuration
+              OIDC_CLIENT_ID: freshrss
+              OIDC_REMOTE_USER_CLAIM: preferred_username
+              OIDC_SCOPES: openid groups email profile
+              OIDC_X_FORWARDED_HEADERS: X-Forwarded-Host X-Forwarded-Port X-Forwarded-Proto
+              DB_HOST:
+                valueFrom:
+                  secretKeyRef:
+                    name: freshrss-db-app
+                    key: host
+              DB_BASE:
+                valueFrom:
+                  secretKeyRef:
+                    name: freshrss-db-app
+                    key: dbname
+              DB_USER:
+                valueFrom:
+                  secretKeyRef:
+                    name: freshrss-db-app
+                    key: user
+              DB_PASSWORD:
+                valueFrom:
+                  secretKeyRef:
+                    name: freshrss-db-app
+                    key: password
+              OIDC_CLIENT_SECRET:
+                valueFrom:
+                  secretKeyRef:
+                    name: oidc-secret
+                    key: key
+    persistence:
+      data:
+        enabled: true
+        type: persistentVolumeClaim
+        storageClass: longhorn
+        accessMode: ReadWriteOnce
+        size: 5Gi
+        retain: true
+        globalMounts:
+          - path: /var/www/FreshRSS/data
+            readOnly: false
+    ingress:
+      app:
+        className: nginx
+        annotations:
+          nginx.ingress.kubernetes.io/proxy-body-size: 20m
+        hosts:
+          - host: freshrss.example.com
+            paths:
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: app
+                  port: 80

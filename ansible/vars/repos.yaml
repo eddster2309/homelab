@@ -1,0 +1,26 @@
+vm_count: 1
+vm_template_id: fedora41
+
+master_cpu: 2
+master_memory: 4096
+disk_size: 100
+
+vm_network: infra_core
+vm_start_ip: 22
+
+service_name: repos
+
+repos_vip: REDACTED_IP
+repos_vip_mask: 24
+
+mirror_subdomain: repos.example.com
+
+mirrors:
+  - name: aarnet
+    url: https://mirror.aarnet.edu.au/
+  - name: rpmfusion
+    url: https://download1.rpmfusion.org/
+  - name: fedora-codecs
+    url: https://codecs.fedoraproject.org/
+
+configure_repos_mirrors: "{{ mirrors }}"
