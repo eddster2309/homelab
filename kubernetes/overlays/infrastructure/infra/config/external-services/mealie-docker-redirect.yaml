@@ -1,0 +1,9 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: 
+  annotations: 
+    nginx.ingress.kubernetes.io/permanent-redirect: "https://mealie.example.com"
+  name: mealie-docker-redirect
+spec: 
+  rules: 
+  - host: mealie.example.com

@@ -1,0 +1,77 @@
+vm_count: 1
+vm_template_id: fedora41
+
+vm_cpu_core_count: 2
+vm_memory: 4096
+vm_disk_size: 30
+
+vm_network: infra_core
+vm_start_ip: 30
+
+service_name: vault
+
+vault_version: 1.19.4
+
+vault_s3_bucket: hashicorp-vault
+vault_s3_region: us-east-1
+
+vault_key_portions: 1
+vault_key_threshold: 1
+
+vault_svc_account_name: svc_vault_local
+
+vault_url: https://vault01.infra.internal
+
+vault_gitlab_url: "https://gitlab.example.com"
+
+vault_ldap_url: "ldaps://ipa01.internal"
+vault_ldap_userdn: "cn=users,cn=accounts,dc=example,dc=com"
+vault_ldap_groupdn: "cn=groups,cn=accounts,dc=example,dc=com"
+vault_ldap_group_attr: memberOf
+vault_ldap_user_attr: uid
+vault_ldap_binddn: "uid=svc_vault_bind,cn=users,cn=accounts,dc=example,dc=com"
+vault_ldap_bindpass: "{{ vault_bind_password }}"
+vault_ldap_certificate: "@/etc/ipa/ca.crt"
+vault_ldap_starttls: true
+
+vault_s3_access_key: "{{ hashicorp_vault_s3_bucket_access_key }}"
+vault_s3_secret_key: "{{ hashicorp_vault_s3_bucket_access_secret }}"
+vault_s3_endpoint: "https://s3.example.com"
+
+vault_ldap_policy_mappings:
+  - ldap_group: vault-admins
+    policy: admin
+  - ldap_group: vault-k8s-infra-secrets-ro
+    policy: k8s-infra-ro
+
+vault_kv_secret_engines:
+  - path: k8s-infra
+  - path: k8s-gitlab-cicd
+
+vault_policies:
+  - name: k8s-infra-ro
+    rules:
+      - path: "k8s-infra/*"
+        capabilities:
+          - read
+          - list
+  - name: k8s-gitlab-cicd-jwt
+    rules:
+      - path: !unsafe 'k8s-gitlab-cicd/data/{{identity.entity.aliases.auth_jwt_4e1b38e1.metadata.project_path}}/*'
+        capabilities:
+          - read
+          - list
+      - path: !unsafe 'k8s-gitlab-cicd/data/{{identity.entity.aliases.auth_jwt_4e1b38e1.metadata.namespace_path}}/+'
+        capabilities:
+          - read
+          - list
+
+vault_jwt_default_role: k8s-gitlab-cicd
+
+vault_jwt_roles:
+  - name: k8s-gitlab-cicd
+    policies:
+      - k8s-gitlab-cicd-jwt
+    claim_mappings:
+      project_path: "project_path"
+      namespace_path: "namespace_path"

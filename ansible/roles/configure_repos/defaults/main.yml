@@ -1,0 +1,13 @@
+---
+# defaults file for configure_repos
+configure_repos_cache_root: /var/cache/
+
+configure_repos_configure_repos_mirrors:
+  - name: aarnet
+    url: https://mirror.aarnet.edu.au/pub/
+  - name: rpmfusion
+    url: https://download1.rpmfusion.org/
+
+configure_repos_log_root: /var/log/repocache
+
+configure_repos_vhosts_root: /etc/nginx/vhosts

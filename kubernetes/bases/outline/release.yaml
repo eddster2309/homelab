@@ -1,0 +1,56 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: outline
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: app-template
+      version: "*"
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      interval: 12h
+  values: 
+    controllers:
+      outline:
+        containers:
+          app:
+            env:
+              WEB_CONCURRENCY: 10
+              ENABLE_UPDATES: "false"
+              PORT: 8080
+            command:
+              [
+                /bin/sh,
+                -c,
+                yarn db:migrate --env=production-ssl-disabled && yarn start --env=production-ssl-disabled,
+              ]
+            image:
+              repository: docker.io/outlinewiki/outline
+              tag: 1.5.0
+            probes:
+              liveness:
+                enabled: false
+              readiness:
+                enabled: false
+            resources:
+              limits:
+                memory: 2000Mi
+              requests:
+                cpu: 10m
+                memory: 250Mi
+    service:
+      app:
+        controller: outline
+        ports:
+          http:
+            port: 8080
+    defaultPodOptions:
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 1000
+        runAsUser: 1000

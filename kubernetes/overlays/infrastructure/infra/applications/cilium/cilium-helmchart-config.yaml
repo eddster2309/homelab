@@ -1,0 +1,62 @@
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: rke2-cilium
+  namespace: kube-system
+spec:
+  valuesContent: |
+    kubeProxyReplacement: true
+    k8sServiceHost: REDACTED_IP
+    k8sServicePort: 6443
+    tunnelProtocol: geneve # New
+    bpf: # New
+      masquerade: true # New
+    loadBalancer:                     # New
+      mode: dsr                       # New
+      dsrDispatch: geneve             # New
+    l2announcements:
+      enabled: true
+    cni:
+      exclusive: false
+    hostFirewall:
+      enabled: false
+    monitor:
+      enabled: false
+    prometheus:
+      metricsService: true
+      enabled: true
+      serviceMonitor:
+        enabled: true
+    dashboards:
+      enabled: true
+    hubble: 
+      enabled: true
+      serviceMonitor:
+        enabled: true
+      #metrics:
+      #  enableOpenMetrics: true
+      #  enabled: 
+      #    - dns
+      #    - drop
+      #    - flow
+      #    - flows-to-world
+      #    - httpV2:exemplars=true;labelsContext=source_ip,source_namespace,source_workload,destination_ip,destination_namespace,destination_workload,traffic_direction
+      #    - icmp
+      #    - port-distribution
+      #    - tcp
+      dashboards:
+        enabled: true
+      relay: 
+        enabled: true
+      ui: 
+        enabled: true 
+        ingress:
+          enabled: true
+          className: "nginx"
+          annotations:
+            nginx.ingress.kubernetes.io/auth-method: 'GET'
+            nginx.ingress.kubernetes.io/auth-signin: "https://auth.example.com?rm=$request_method"
+            nginx.ingress.kubernetes.io/auth-url: "http://authelia.authelia.svc.cluster.local/api/authz/auth-request"
+          hosts:
+            - cilium.example.com
+

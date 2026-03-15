@@ -1,0 +1,59 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: external-dns
+  namespace: external-dns
+spec:
+  chart:
+    spec:
+      version: "1.20.0"
+  values:
+    # policy: sync
+    # env:
+    #   - name: EXTERNAL_DNS_RFC2136_TSIG_SECRET
+    #     valueFrom:
+    #       secretKeyRef:
+    #         name: ipa-tsig-secret
+    #         key: rfc2136_tsig_secret
+    # provider: 
+    #   name: rfc2136
+    #   # rfc2136:
+    #   #   host: ipa01.internal
+    #   #   tsigKeyname: acme-update
+    #   #   tsigSecretAlg: hmac-sha512
+    #   #   zones:
+    #   #     - "example.com"
+    # serviceMonitor:
+    #   enabled: true
+    # extraArgs:
+    #   - --rfc2136-host=REDACTED_IP
+    #   - --rfc2136-port=53
+    #   - --rfc2136-zone=example.com
+    #   - --rfc2136-tsig-keyname=acme-update
+    #   - --rfc2136-tsig-secret-alg=hmac-sha512
+    #   - --rfc2136-tsig-secret=$(EXTERNAL_DNS_RFC2136_TSIG_SECRET)
+    # dnsConfig:
+    #   nameservers:
+    #     - "REDACTED_IP"
+    #     - "REDACTED_IP"
+    policy: sync
+    logLevel: debug
+    logFormat: json
+    domainFilters:
+      - example.com # only handle DDNS for *.int.shirwalab.net
+    # txtPrefix: external-dns-internal-
+    # txtOwnerId: shirwalab-internal
+    provider: rfc2136
+    env:
+      - name: EXTERNAL_DNS_RFC2136_TSIG_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: ipa-tsig-secret
+            key: rfc2136_tsig_secret
+    extraArgs:
+      - --rfc2136-host=ipa01.internal
+      - --rfc2136-port=53
+      - --rfc2136-zone=example.com
+      - --rfc2136-tsig-keyname=acme-update
+      - --rfc2136-tsig-secret-alg=hmac-sha512
+      - --rfc2136-tsig-axfr

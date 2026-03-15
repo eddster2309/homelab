@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- repositories.yaml
+- config.yaml
+- external-secrets.yaml
+- external-secrets-config.yaml
+- cert-manager.yaml
+- cert-manager-csi.yaml
+- cert-manager-config.yaml
+- cilium.yaml
+- longhorn-config.yaml
+- longhorn.yaml
+- ingress-nginx.yaml
+- external-dns-ipa.yaml
+- openshift-console.yaml
+- cloudnative-pg.yaml
+- authelia.yaml
+- dragonfly-operator.yaml
+- monitoring.yaml
+- csi-driver-nfs.yaml
+- headlamp.yaml
+- reloader.yaml
+- blocky.yaml
+- traefik.yaml

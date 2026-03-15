@@ -1,0 +1,57 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: open-webui
+spec:
+  values:
+    image:
+      tag: v0.8.10
+    ingress:
+      enabled: true
+      host: openwebui.example.com
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    extraEnvVars:
+      - name: ENABLE_OAUTH_SIGNUP
+        value: "true"
+      - name: OAUTH_PROVIDER_NAME
+        value: "Authelia"
+      - name: OPENID_PROVIDER_URL
+        value: "https://auth.example.com/.well-known/openid-configuration"
+      - name: OAUTH_CLIENT_ID
+        value: "open-webui"
+      - name: OAUTH_SCOPES
+        value: "openid profile email groups"
+      - name: OAUTH_CLIENT_SECRET
+        valueFrom:
+          secretKeyRef:
+            name: oidc-secret
+            key: OAUTH_CLIENT_SECRET
+      - name: ENABLE_OAUTH_GROUP_CREATION
+        value: "true"
+      - name: ENABLE_OAUTH_ROLE_MANAGEMENT
+        value: "true"
+      - name: OAUTH_ROLES_CLAIM
+        value: "groups"
+      - name: OAUTH_ALLOWED_ROLES
+        value: "k8s-open-webui-users,k8s-open-webui-admins"
+      - name: OAUTH_ADMIN_ROLES
+        value: "k8s-open-webui-admin"
+      - name: ENABLE_LOGIN_FORM
+        value: "false"
+      - name: "ENABLE_PASSWORD_AUTH"
+        value: "false"
+      - name: SHOW_ADMIN_DETAILS
+        value: "false"
+      - name: ENABLE_PUBLIC_ACTIVE_USERS_COUNT
+        value: "false"
+      - name: ENABLE_USER_STATUS
+        value: "false"
+      - name: "ENABLE_EASTER_EGGS"
+        value: "false"
+      - name: AIOHTTP_CLIENT_SESSION_SSL
+        value: "false"
+    ollamaUrls:
+      - "https://REDACTED_IP:7869"
+    ollama:
+      enabled: false

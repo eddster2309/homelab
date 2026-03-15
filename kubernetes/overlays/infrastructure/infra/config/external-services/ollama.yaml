@@ -1,0 +1,55 @@
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: external-service-ollama
+  labels:
+    kubernetes.io/service-name: external-service-ollama
+addressType: IPv4
+ports:
+  - port: 7869
+    name: https
+    protocol: TCP
+endpoints:
+  - addresses:
+    - "REDACTED_IP"
+    conditions:
+      ready: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-service-ollama
+spec:
+  ports:
+    - port: 7869
+      protocol: TCP
+      targetPort: 7869
+      name: https
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: external-service-ollama
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    nginx.ingress.kubernetes.io/proxy-ssl-verify: "off"
+    nginx.ingress.kubernetes.io/satisfy: "any"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "REDACTED_IP/8,REDACTED_IP/12,REDACTED_IP/16"
+    nginx.ingress.kubernetes.io/auth-method: 'GET'
+    nginx.ingress.kubernetes.io/auth-signin: "https://auth.example.com?rm=$request_method"
+    nginx.ingress.kubernetes.io/auth-url: "http://authelia.authelia.svc.cluster.local/api/authz/auth-request"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ollama.example.com
+      http:
+        paths:
+        - backend:
+            service:
+              name: external-service-ollama
+              port:
+                number: 7869
+          path: /
+          pathType: ImplementationSpecific
