@@ -1,0 +1,14 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: gitlab-ci
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  path: ./kubernetes/overlays/apps/infra/applications/gitlab-ci
+  prune: true
+  dependsOn:
+    - name: gitlab
+  sourceRef:
+    kind: GitRepository
+    name: flux-system

@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rsyslog-config
+data:
+  rsyslog.conf: |
+    global(workDirectory="/var/lib/rsyslog")
+
+    module(load="imudp")
+    module(load="imtcp")
+
+    # RFC5424 template embedding sender IP as structured data.
+    # Uses $! properties set by rainerscript so nil fields become '-'.
+    template(name="rfc5424_with_src_ip" type="string"
+        string="<%pri%>1 %timegenerated:::date-rfc3339% %hostname% %$!_appname% %$!_procid% %$!_msgid% [rsyslog src_ip=\"%fromhost-ip%\"] %msg:::sp-if-no-1st-sp%%msg%\n"
+    )
+
+    ruleset(name="forward_to_alloy") {
+        # Normalise nil syslog fields to RFC5424 NILVALUE so Alloy can parse them.
+        set $!_appname = $app-name;
+        if $!_appname == "" then set $!_appname = "-";
+        set $!_procid = $procid;
+        if $!_procid == "" then set $!_procid = "-";
+        set $!_msgid = $msgid;
+        if $!_msgid == "" then set $!_msgid = "-";
+
+        action(
+            type="omfwd"
+            target="k8s-monitoring-logs-collector.monitoring.svc.cluster.local"
+            port="51515"
+            protocol="udp"
+            template="rfc5424_with_src_ip"
+        )
+    }
+
+    input(type="imudp" port="51514" ruleset="forward_to_alloy")
+    input(type="imtcp" port="51514" ruleset="forward_to_alloy")

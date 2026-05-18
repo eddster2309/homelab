@@ -1,0 +1,7 @@
+#SPDX-License-Identifier: MIT-0
+---
+# handlers file for zot
+- name: Restart Zot
+  ansible.builtin.systemd:
+    name: zot
+    state: restarted

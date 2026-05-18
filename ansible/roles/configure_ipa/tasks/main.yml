@@ -1,0 +1,17 @@
+---
+# tasks file for install_freeipa
+- name: Add IPA hosts to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars[item].ansible_host }} {{ hostvars[item].inventory_hostname }} {{ hostvars[item].inventory_hostname_short }}"
+    state: present
+  with_items: "{{ groups.pve_ans_ipa }}"
+
+- name: IPA Security
+  ansible.builtin.include_tasks: ipa_security.yaml
+
+- name: IPA RBAC
+  ansible.builtin.include_tasks: ipa_rbac.yaml
+
+- name: IPA DNS
+  ansible.builtin.include_tasks: ipa_dns.yaml

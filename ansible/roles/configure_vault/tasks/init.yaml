@@ -1,0 +1,26 @@
+- name: Init Vault
+  environment:
+    VAULT_ADDR: "{{ vault_internal_url }}"
+  block:
+    - name: Initialize vault
+      ansible.builtin.command: "vault operator init -key-shares={{ vault_key_portions }} -key-threshold={{ vault_key_threshold }} -format=json"
+      register: vault_init
+      changed_when: vault_init.rc == 0
+
+    - name: Get unseal keys
+      ansible.builtin.set_fact:
+        unseal_keys: "{{ vault_init.stdout | from_json | json_query('unseal_keys_b64') }}"
+
+    - name: Debug unseal keys
+      ansible.builtin.debug:
+        var: unseal_keys
+
+    - name: Unseal vault
+      ansible.builtin.command: "vault operator unseal {{ item }}"
+      register: vault_unseal
+      changed_when: vault_unseal.rc == 0
+      loop: "{{ unseal_keys }}"
+
+    - name: Set Root Token fact
+      ansible.builtin.set_fact:
+        vault_auth_token: "{{ vault_init.stdout | from_json | json_query('root_token') }}"

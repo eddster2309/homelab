@@ -1,0 +1,17 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: open-webui
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  path: ./kubernetes/overlays/apps/infra/applications/open-webui
+  healthChecks:
+    - kind: HelmRelease
+      name: open-webui
+      namespace: open-webui
+      apiVersion: helm.toolkit.fluxcd.io/v2beta1
+  prune: true
+  sourceRef:
+    kind: "GitRepository"
+    name: "flux-system"

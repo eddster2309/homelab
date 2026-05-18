@@ -1,0 +1,115 @@
+- name: Deploy infrastructure
+  hosts: localhost
+  vars_files:
+    - vars/freeipa.yaml
+  tasks:
+    - name: Deploy freeipa nodes on proxmox
+      ansible.builtin.include_role:
+        name: node_create
+
+- name: Add IPA hosts to /etc/hosts
+  hosts: pve_ans_ipa
+  become: true
+  vars_files:
+    - vars/freeipa.yaml
+  tasks:
+    - name: Set hostname
+      ansible.builtin.hostname:
+        name: "{{ ansible_hostname }}.{{ dns_zone }}"
+
+    - name: Add IPA hosts to /etc/hosts
+      ansible.builtin.lineinfile:
+        dest: /etc/hosts
+        line: "{{ hostvars[item].ansible_host }} {{ hostvars[item].inventory_hostname_short }}.{{ dns_zone }} {{ hostvars[item].inventory_hostname_short }}"
+        state: present
+      with_items: "{{ ansible_play_hosts }}"
+
+    - name: Remove all dns Servers
+      ansible.builtin.lineinfile:
+        dest: /etc/resolv.conf
+        regexp: '^nameserver'
+        state: absent
+
+    - name: Change DNS Servers
+      ansible.builtin.lineinfile:
+        dest: /etc/resolv.conf
+        line: "nameserver {{ item }}"
+        state: present
+      with_items: "{{ dns_servers }}"
+
+
+- name: Install IPA Master
+  hosts: pve_ans_ipa_primary
+  become: true
+  vars_files:
+    - vars/freeipa.yaml
+  vars:
+    ipaserver_setup_dns: "{{ ipa_setup_dns }}"
+    ipaserver_auto_forwarders: "{{ ipa_setup_ca }}"
+  roles:
+    - role: freeipa.ansible_freeipa.ipaserver
+
+- name: Install IPA replicas
+  hosts: pve_ans_ipa_secondary
+  become: true
+  vars_files:
+    - vars/freeipa.yaml
+  vars:
+    ipareplica_setup_ca: "{{ ipa_setup_dns }}"
+    ipareplica_setup_dns: "{{ ipa_setup_ca }}"
+    ipareplica_auto_forwarders: "{{ ipa_auto_forwarders }}"
+    ipaclient_force_join: true
+  roles:
+    - role: freeipa.ansible_freeipa.ipareplica
+
+- name: Install keepalived
+  hosts: pve_ans_ipa
+  become: true
+  vars_files:
+    - vars/freeipa.yaml
+  tasks:
+    - name: Install keepalived
+      ansible.builtin.include_role:
+        name: evrardjp.keepalived
+      vars:
+        keepalived_show_ansible_managed: true
+        keepalived_instances:
+          internal:
+            interface: "{{ ansible_default_ipv4.interface }}"
+            state: "{{ (groups[ipa_server_ansible_group_name].index(inventory_hostname) == 0) | ternary('MASTER', 'BACKUP') }}"
+            virtual_router_id: "{{ vrrp_id | default(42) }}"
+            priority: "{{ (inventory_hostname == groups[ipa_server_ansible_group_name][0]) | ternary('200', '100') }}"
+            vips:
+              - "{{ vrrp_ip }}/{{ vrrp_subnet }} dev {{ ansible_default_ipv4.interface }}"
+
+- name: Configure SSSD Authselect
+  hosts: pve_ans_ipa
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Run authselect
+      ansible.builtin.command: authselect select sssd with-sudo with-mkhomedir
+      changed_when: false
+
+- name: Configure IPA
+  hosts: pve_ans_ipa_primary
+  become: true
+  tags:
+    - configure
+  vars_files:
+    - vars/freeipa.yaml
+  roles:
+    - role: configure_ipa
+
+- name: Configure IPA DNS recursive
+  hosts: pve_ans_ipa
+  gather_facts: true
+  become: true
+  tasks:
+    - name: Add recursive allow to config
+      ansible.builtin.lineinfile:
+        dest: /etc/named/ipa-options-ext.conf
+        line: 'allow-recursion { any; };'
+    - name: Restart
+      ansible.builtin.reboot:
+        reboot_timeout: 3600

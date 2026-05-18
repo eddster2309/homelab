@@ -1,0 +1,16 @@
+- name: Upgrade Terraform Providers
+  hosts: localhost
+  connection: local
+  vars_files:
+    - vars/vault.yaml
+  tasks:
+    - name: Upgrade Init Terraform
+      environment:
+        AWS_ENDPOINT_URL_S3: "{{ tf_state_s3_endpoint_url }}"
+        AWS_ACCESS_KEY_ID: "{{ tf_state_access_key }}"
+        AWS_SECRET_ACCESS_KEY: "{{ tf_state_secret_key }}"
+        AWS_DEFAULT_REGION: "{{ tf_state_region }}"
+      ansible.builtin.command: "terraform init -upgrade"
+      changed_when: false
+      args:
+        chdir: "{{ playbook_dir }}/roles/node_create/files/terraform"

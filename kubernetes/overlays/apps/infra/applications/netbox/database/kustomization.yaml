@@ -1,0 +1,3 @@
+resources:
+  - dragonfly.yaml
+  - postgres.yaml

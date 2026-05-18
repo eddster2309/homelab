@@ -1,0 +1,48 @@
+namespace: authelia
+resources:
+  - ../../../../../bases/authelia
+  - database/
+  - secrets/
+  - network-policies/
+components:
+  - ../../../../../components/ca-certs/
+  - ../../../../../components/network-policies/
+  - ../../../../../components/cnpg-barman-backup
+patches:
+  - target:
+      kind: HelmRelease
+    path: authelia-patch.yaml
+  - target:
+      kind: ScheduledBackup
+      name: cnpg-nightly-backup
+    patch: |
+      - op: replace
+        path: /spec/cluster/name
+        value: authelia-db
+  - target:
+      kind: RoleBinding
+      name: cnpg-backup-s3-reader
+    patch: |
+      - op: replace
+        path: /subjects/0/name
+        value: authelia-db
+  - target:
+      kind: SecretStore
+      name: k8s-store
+    patch: |
+      - op: add
+        path: /spec/provider/kubernetes/remoteNamespace
+        value: authelia
+
+configMapGenerator:
+  - name: ldap-config
+    files:
+      - config/config.ldap.yaml
+  - name: oidc-config
+    files:
+      - config/config.oidc.yaml
+  - name: acl-config
+    files:
+      - config/config.acl.yaml
+generatorOptions:
+  disableNameSuffixHash: true

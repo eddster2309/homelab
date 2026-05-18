@@ -1,0 +1,22 @@
+version: "3.9"
+services:
+  frigate:
+    network_mode: host
+    container_name: frigate
+    privileged: true # this may not be necessary for all setups
+    restart: unless-stopped
+    image: ghcr.io/blakeblackshear/frigate:stable
+    shm_size: "512mb"
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./config.yml:/config/config.yml
+      - {{ install_frigate_storage_path }}/cctv:/media/frigate
+      - {{ install_frigate_storage_path }}/data:/media/dbdata
+      - type: tmpfs # Optional: 1GB of memory, reduces SSD/SD Card wear
+        target: /tmp/cache
+        tmpfs:
+          size: 1000000000
+    environment:
+      FRIGATE_RTSP_PASSWORD: "password"
