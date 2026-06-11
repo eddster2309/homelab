@@ -1,0 +1,118 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+{% if alloy_extra_config is defined %}
+{{ alloy_extra_config }}
+{% endif %}
+
+{% if docker_check is not failed %}
+discovery.docker "linux" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "logs_integrations_docker" {
+  targets = []
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex = "/(.*)"
+    target_label = "service_name"
+  }
+}
+// Configure a loki.source.docker component to collect logs from Docker containers.
+loki.source.docker "default" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.docker.linux.targets
+  labels     = {"platform" = "docker"}
+  relabel_rules = discovery.relabel.logs_integrations_docker.rules
+  forward_to = [loki.process.global_labels.receiver]
+}
+
+{% endif %}
+local.file_match "local_files" {
+  path_targets = [{"__path__" = "/var/log/**/*.log"},{"__path__" = "/var/log/secure"}]
+  sync_period = "5s"
+}
+
+loki.source.file "log_scrape" {
+  targets    = local.file_match.local_files.targets
+  forward_to = [loki.process.global_labels.receiver]
+  tail_from_end = true
+}
+
+loki.relabel "journal" {
+  forward_to = []
+
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+}
+
+loki.source.journal "read"  {
+  forward_to    = [loki.process.global_labels.receiver]
+  relabel_rules = loki.relabel.journal.rules
+  labels        = {component = "loki.source.journal"}
+}
+
+loki.process "global_labels" {
+  forward_to = [loki.write.grafana_loki.receiver]
+
+  stage.static_labels {
+    values = {
+      host = sys.env("HOSTNAME"),
+    }
+  }
+}
+
+loki.write "grafana_loki" {
+  endpoint {
+    url = "{{ alloy_logs_url }}"
+  }
+}
+
+{% if docker_check is not failed %}
+prometheus.exporter.cadvisor "docker_metrics" {
+  docker_host = "unix:///var/run/docker.sock"
+  storage_duration = "5m"
+}
+
+prometheus.scrape "scraper" {
+  targets    = prometheus.exporter.cadvisor.docker_metrics.targets
+  forward_to = [ prometheus.relabel.filter_metrics.receiver ]
+}
+{% endif %}
+
+prometheus.exporter.self "alloy_self" {}
+
+prometheus.exporter.unix "local_system" { }
+
+prometheus.scrape "scrape_metrics_unix" {
+  targets         = prometheus.exporter.unix.local_system.targets
+  forward_to      = [prometheus.relabel.filter_metrics.receiver]
+  scrape_interval = "10s"
+}
+
+prometheus.scrape "scrape_metrics_self" {
+  targets         = prometheus.exporter.self.alloy_self.targets
+  forward_to      = [prometheus.relabel.filter_metrics.receiver]
+  scrape_interval = "10s"
+}
+
+prometheus.relabel "filter_metrics" {
+  rule {
+    action        = "drop"
+    source_labels = ["env"]
+    regex         = "dev"
+  }
+
+  forward_to = [prometheus.remote_write.metrics_service.receiver]
+}
+
+prometheus.remote_write "metrics_service" {
+  endpoint {
+      url = "{{ alloy_metrics_url }}"
+  }
+}

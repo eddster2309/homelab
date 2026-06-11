@@ -1,0 +1,63 @@
+- name: Create vault policy directory
+  ansible.builtin.file:
+    path: /etc/vault.d/policies
+    state: directory
+    mode: '0755'
+    owner: "vault"
+    group: "vault"
+
+- name: Add Default policies
+  ansible.builtin.set_fact:
+    vault_policies: "{{ vault_policies | default([]) + configure_vault_default_policies }}"
+
+- name: Template policies
+  ansible.builtin.template:
+    src: policy.hcl.j2
+    dest: "/etc/vault.d/policies/{{ item.name }}.hcl"
+    mode: "0644"
+    owner: vault
+    group: vault
+  loop: "{{ vault_policies }}"
+
+- name: Get policies
+  ansible.builtin.find:
+    paths: /etc/vault.d/policies
+    patterns: "*.hcl"
+    recurse: true
+    file_type: file
+  register: vault_policies_disk
+
+- name: Delete old policies
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: absent
+  loop: "{{ vault_policies_disk.files }}"
+  when: (item.path | basename | splitext | first) not in (vault_policies | map(attribute='name') | list)
+
+- name: Get policies
+  ansible.builtin.find:
+    paths: /etc/vault.d/policies
+    patterns: "*.hcl"
+    recurse: true
+    file_type: file
+  register: vault_policies_disk
+
+- name: Create policies
+  ansible.builtin.command: "vault policy write {{ item.path | basename | regex_replace('.hcl', '') }} {{ item.path }}"
+  changed_when: false
+  when: item.path is search('.hcl')
+  loop: "{{ vault_policies_disk.files }}"
+
+- name: Get policies from vault
+  ansible.builtin.command: "vault policy list -format=json"
+  register: vault_policies_list
+  changed_when: false
+  failed_when: vault_policies_list.rc != 0 and vault_policies_list.rc != 2
+
+- name: Delete policies from vault
+  ansible.builtin.command: "vault policy delete {{ item }}"
+  register: vault_policy_delete
+  changed_when: vault_policy_delete.rc == 0
+  failed_when: vault_policy_delete.rc != 0 and vault_policy_delete.rc != 2
+  loop: "{{ vault_policies_list.stdout | from_json | list }}"
+  when: item not in (vault_policies | map(attribute='name') | list) and item not in configure_vault_protected_policies

@@ -1,0 +1,48 @@
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: external-service-kasm
+  labels:
+    kubernetes.io/service-name: external-service-kasm
+addressType: IPv4
+ports:
+  - port: 443
+    name: https
+    protocol: TCP
+endpoints:
+  - addresses:
+    - "REDACTED_IP"
+    conditions:
+      ready: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-service-kasm
+  annotations:
+    traefik.ingress.kubernetes.io/service.serverstransport: default-insecure-tls@kubernetescrd
+spec:
+  ports:
+    - port: 443
+      protocol: TCP
+      targetPort: 443
+      name: https
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: external-service-kasm
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: kasm.example.com
+      http:
+        paths:
+        - backend:
+            service:
+              name: external-service-kasm
+              port:
+                number: 443
+          path: /
+          pathType: ImplementationSpecific

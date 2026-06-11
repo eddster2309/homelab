@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: gitlab-agent
+resources:
+- ../../../../../bases/gitlab-agent
+- agent-token.yaml
+patches:
+- target:
+    kind: HelmRelease
+    name: gitlab-agent
+  path: gitlab-agent-patch.yaml

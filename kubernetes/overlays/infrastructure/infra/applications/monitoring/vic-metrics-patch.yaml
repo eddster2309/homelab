@@ -1,0 +1,141 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: vicmetrics
+  namespace: monitoring
+spec:
+  chart:
+    spec:
+      version: "0.72.5"
+  values:
+    defaultDashboards:
+      enabled: true
+      defaultTimzezone: "Australia/Sydney"
+    vmsingle:
+      enabled: false
+    kubeControllerManager:
+      enabled: false
+    kubeScheduler:
+      enabled: false
+    kubeEtcd:
+      enabled: false
+    vmcluster:
+      enabled: true
+      spec:
+        vmstorage:
+          replicaCount: 1
+          extraArgs:
+            downsampling.period: "{job=\"nsw_fuel_prices\"}:30d:1h,{job=\"nsw_fuel_prices\"}:90d:2h,30d:10m,180d:30m,1y:1h"
+            retentionPeriod: "2y"
+            retentionFilter: "{job=\"nsw_fuel_prices\"}:2y"
+          storage:
+            volumeClaimTemplate:
+              spec:
+                resources:
+                  requests:
+                    storage: 80Gi
+          image:
+            repository: gitlab-registry.example.com/jack/victoria-metrics-patcher/vmstorage
+            tag: v1.144.0-enterprise-cluster
+        vminsert:
+          replicaCount: 1
+          image:
+            repository: gitlab-registry.example.com/jack/victoria-metrics-patcher/vminsert
+            tag: v1.144.0-enterprise-cluster
+        vmselect:
+          replicaCount: 1
+          image:
+            repository: gitlab-registry.example.com/jack/victoria-metrics-patcher/vmselect
+            tag: v1.144.0-enterprise-cluster
+      ingress:
+        insert:
+          enabled: true
+          ingressClassName: traefik
+          hosts:
+            - vm-insert.example.com
+            - monitoring.example.com
+          path: /insert
+    vmagent:
+      enabled: true
+      spec:
+        extraArgs:
+          promscrape.maxScrapeSize: "67108864"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 200Mi
+          limits:
+            cpu: 500m
+            memory: 500Mi
+      ingress:
+        enabled: true
+        ingressClassName: traefik
+        annotations:
+          traefik.ingress.kubernetes.io/router.middlewares: traefik-authelia@kubernetescrd
+        hosts:
+          - vm-agent.example.com
+    victoria-metrics-operator:
+      operator:
+        disable_prometheus_converter: false
+    grafana:
+      enabled: true
+      replicas: 1
+
+      persistence:
+        enabled: true
+        size: 10Gi
+      plugins:
+        - victoriametrics-logs-datasource
+      sidecar:
+        dashboards:
+          enabled: true
+          label: grafana_dashboard
+          searchNamespace: ALL
+        datasources:
+          enabled: true
+          label: grafana_datasource
+          searchNamespace: ALL
+      ingress:
+        enabled: true
+        ingressClassName: traefik
+        annotations:
+          traefik.ingress.kubernetes.io/router.middlewares: traefik-authelia@kubernetescrd
+        hosts:
+          - grafana.example.com
+      env:
+        GF_AUTH_GENERIC_OAUTH_ENABLED: true
+        GF_AUTH_GENERIC_OAUTH_NAME: "Eddster Auth"
+        GF_AUTH_GENERIC_OAUTH_ICON: signin
+        GF_AUTH_OAUTH_AUTO_LOGIN: true
+        GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: "contains(groups[*], 'k8s-grafana-viewer') && 'Viewer' || contains(groups[*], 'k8s-grafana-admin') && 'Admin' || contains(groups[*], 'k8s-grafana-editor') && 'Editor' || contains(groups[*], 'k8s-grafana-global-admin') && 'GrafanaAdmin'"
+        GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_STRICT: true
+        GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN: true
+        GF_AUTH_OAUTH_ALLOW_INSECURE_EMAIL_LOOKUP: true
+        GF_SERVER_ROOT_URL: "https://grafana.example.com"
+        GF_AUTH_GENERIC_OAUTH_SCOPES: "openid email profile groups"
+        GF_AUTH_GENERIC_OAUTH_EMPTY_SCOPES: false
+        GF_AUTH_GENERIC_OAUTH_AUTH_URL: https://auth.example.com/api/oidc/authorization
+        GF_AUTH_GENERIC_OAUTH_TOKEN_URL: https://auth.example.com/api/oidc/token
+        GF_AUTH_GENERIC_OAUTH_API_URL: https://auth.example.com/api/oidc/userinfo
+        GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH: preferred_username
+        GF_AUTH_GENERIC_OAUTH_GROUPS_ATTRIBUTE_PATH: groups
+        GF_AUTH_GENERIC_OAUTH_NAME_ATTRIBUTE_PATH: name
+        GF_AUTH_GENERIC_OAUTH_USE_PKCE: true
+        GF_AUTH_GENERIC_OAUTH_CLIENT_ID: grafana
+        GF_ANALYTICS_ENABLED: false
+        GF_ANALYTICS_REPORTING_ENABLED: false
+        GF_FEEDBACK_LINKS_ENABLED: false
+        GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION: true
+        GF_SNAPSHOTS_ENABLED: false
+        GF_AUTH_DISABLE_LOGIN_FORM: true
+        GF_DISABLE_SIGNOUT_MENU: true
+        GF_NEWS_NEWS_FEED_ENABLED: false
+        GF_DATE_FORMATS_DEFAULT_TIMEZONE: "Australia/Sydney"
+        GF_PUBLIC_DASHBOARDS_ENABLED: false
+        GF_FEATURE_TOGGLES_FEATURE_DASHGPT: false
+        GF_FEATURE_TOGGLES_FEATURE_ONPREMTOCLOUDMIGRATIONS: false
+
+      
+      envFromSecret: auth-secret
+    prometheus-node-exporter:
+      enabled: true

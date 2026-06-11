@@ -1,0 +1,34 @@
+namespace: immich
+resources: 
+  - ../../../../../bases/immich
+  - database/
+  - oidc-secret.yaml
+  - s3-secrets.yaml
+  - nfs-data-pvc.yaml
+components:
+  - ../../../../../components/ca-certs/
+  - ../../../../../components/cnpg-barman-backup
+patches:
+  - target:
+      kind: HelmRelease
+      name: immich
+    path: immich-patch.yaml
+  - target:
+      kind: ScheduledBackup
+      name: cnpg-nightly-backup
+    patch: |
+      - op: replace
+        path: /spec/cluster/name
+        value: immich-db
+  - target:
+      kind: RoleBinding
+      name: cnpg-backup-s3-reader
+    patch: |
+      - op: replace
+        path: /subjects/0/name
+        value: immich-db
+  - target:
+      kind: HelmRelease
+      name: immich-share
+    path: immich-share-patch.yaml
+

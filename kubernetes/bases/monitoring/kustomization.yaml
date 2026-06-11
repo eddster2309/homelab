@@ -1,0 +1,7 @@
+resources:
+  - namespace.yaml
+  - vicmetrics-release.yaml
+  - prom-stack-release.yaml
+  - loki-release.yaml
+  - k8s-monitoring-release.yaml
+  - blackbox-exporter-release.yaml

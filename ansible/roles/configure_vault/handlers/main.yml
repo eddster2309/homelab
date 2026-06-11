@@ -1,0 +1,6 @@
+---
+# handlers file for configure_vault
+- name: Restart Vault
+  ansible.builtin.systemd:
+    name: vault
+    state: restarted

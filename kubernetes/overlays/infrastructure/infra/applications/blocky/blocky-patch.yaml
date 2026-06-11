@@ -1,0 +1,45 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: blocky
+spec:
+  chart:
+    spec:
+      version: "22.8.2"
+  values:
+    service:
+      dns:
+        type: LoadBalancer
+        annotations:
+          lbipam.cilium.io/ips: "REDACTED_IP"
+
+    blocky:
+      config:
+        upstream:
+          default:
+            - REDACTED_IP
+            - REDACTED_IP
+        blocking:
+          denylists:
+            ads:
+              - https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+              - https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/multi.txt
+          clientGroupsBlock:
+            default:
+              - ads
+        caching:
+          minTime: 5m
+          maxTime: 30m
+        log:
+          level: info
+          format: text
+
+    podAnnotations:
+      reloader.stakater.com/auto: "true"
+    
+    k8sgateway:
+      enabled: false
+    
+    rbac:
+      main:
+        enabled: false
