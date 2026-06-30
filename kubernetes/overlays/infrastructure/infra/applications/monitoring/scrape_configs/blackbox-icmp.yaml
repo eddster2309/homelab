@@ -1,0 +1,21 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMStaticScrape
+metadata:
+  name: blackbox-icmp
+spec:
+  jobName: blackbox-icmp
+  targetEndpoints:
+    - path: /probe
+      targets:
+        - REDACTED_IP
+        - REDACTED_IP
+        - REDACTED_IP
+      params:
+        module: [icmp]
+      relabelConfigs:
+        - sourceLabels: [__address__]
+          targetLabel: __param_target
+        - sourceLabels: [__param_target]
+          targetLabel: instance
+        - targetLabel: __address__
+          replacement: blackbox-exporter-prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115

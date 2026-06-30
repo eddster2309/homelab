@@ -1,0 +1,16 @@
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: cilium-api-server-egress
+  namespace: default
+spec:
+  endpointSelector:
+    matchLabels:
+      cnpg.io/podRole: instance
+  egress:
+  - toEntities:
+    - kube-apiserver
+  - toPorts:
+    - ports:
+      - port: "6443"
+        protocol: TCP

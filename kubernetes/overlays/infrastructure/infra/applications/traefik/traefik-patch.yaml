@@ -1,0 +1,83 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: traefik
+spec:
+  values:
+    deployment:
+      kind: DaemonSet
+      podAnnotations:
+        reloader.stakater.com/auto: "true"
+
+    ingressClass:
+      enabled: true
+      isDefaultClass: true
+
+    service:
+      type: LoadBalancer
+      annotations:
+        lbipam.cilium.io/ips: "REDACTED_IP"
+        lbipam.cilium.io/sharing-key: "traefik"
+        lbipam.cilium.io/sharing-cross-namespace: "traefik,monitoring"
+      spec:
+        externalTrafficPolicy: Cluster
+
+    ports:
+      # TCP entrypoints to replace ingress-nginx TCP mappings.
+      # IngressRouteTCP resources will route these when GitLab/Frigate are migrated.
+      gitlab-shell:
+        port: 2222
+        exposedPort: 222
+        protocol: TCP
+        expose:
+          default: true
+      frigate-rtsp:
+        port: 8554
+        exposedPort: 8554
+        protocol: TCP
+        expose:
+          default: true
+
+    # HTTP -> HTTPS redirect via CLI flags (avoids Helm schema validation on ports.web)
+    additionalArguments:
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--global.sendanonymoususage=false"
+
+    providers:
+      kubernetesIngress:
+        enabled: true
+        ingressClass: traefik
+        allowExternalNameServices: true
+      kubernetesCRD:
+        enabled: true
+        allowCrossNamespace: true
+
+    ingressRoute:
+      dashboard:
+        enabled: true
+        matchRule: Host(`traefik.example.com`)
+        entryPoints:
+          - websecure
+        middlewares:
+          - name: authelia
+        annotations:
+          external-dns.alpha.kubernetes.io/hostname: traefik.example.com
+          external-dns.alpha.kubernetes.io/target: "REDACTED_IP"
+
+    metrics:
+      prometheus:
+        serviceMonitor:
+          enabled: true
+
+    tlsOptions:
+      default:
+        minVersion: VersionTLS12
+        cipherSuites:
+          - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+          - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+          - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+          - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+          - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+          - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256

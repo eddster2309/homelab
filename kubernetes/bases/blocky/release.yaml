@@ -1,0 +1,15 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: blocky
+spec:
+  interval: 15m
+  chart:
+    spec:
+      chart: blocky
+      version: "*"
+      sourceRef:
+        kind: HelmRepository
+        name: blocky
+        namespace: flux-system
+      interval: 15m

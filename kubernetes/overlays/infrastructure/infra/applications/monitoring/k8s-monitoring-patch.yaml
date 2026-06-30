@@ -1,0 +1,73 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: alloy
+  namespace: monitoring
+spec:
+  chart:
+    spec:
+      version: "4.1.3"
+  values:
+    cluster:
+      name: rke-alloy
+    destinations:
+      localLoki:
+        type: loki
+        url: http://loki-gateway.monitoring.svc.cluster.local:80/loki/api/v1/push
+    clusterEvents:
+      enabled: true
+      collector: logs-collector
+    nodeLogs:
+      enabled: true
+      collector: logs-collector
+    podLogsViaLoki:
+      enabled: true
+      collector: logs-collector
+    selfReporting:
+      enabled: true
+      collector: logs-collector
+    collectors:
+      logs-collector:
+        presets: [filesystem-log-reader, daemonset]
+        alloy:
+          extraPorts:
+            - name: syslog
+              port: 51515
+              targetPort: 51515
+              protocol: UDP
+        extraConfig: |
+          loki.relabel "syslog_extract_labels" {
+            rule {
+              source_labels = ["__syslog_message_hostname"]
+              target_label  = "host"
+            }
+            rule {
+              source_labels = ["__syslog_message_sd_rsyslog_src_ip"]
+              target_label  = "src_ip"
+            }
+            rule {
+              source_labels = ["__syslog_message_app_name"]
+              target_label  = "app"
+            }
+            rule {
+              source_labels = ["__syslog_message_severity"]
+              target_label  = "severity"
+            }
+            rule {
+              source_labels = ["__syslog_message_facility"]
+              target_label  = "facility"
+            }
+            forward_to = [loki.write.localloki.receiver]
+          }
+
+          loki.source.syslog "syslog_in" {
+            listener {
+              address               = "REDACTED_IP:51515"
+              protocol              = "udp"
+              syslog_format         = "rfc5424"
+              label_structured_data = true
+              labels                = { job = "syslog" }
+            }
+            relabel_rules = loki.relabel.syslog_extract_labels.rules
+            forward_to = [loki.write.localloki.receiver]
+          }

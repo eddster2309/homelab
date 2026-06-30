@@ -1,0 +1,56 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: harbor
+spec:
+  values:
+    expose:
+      type: ingress
+      tls:
+        enabled: false
+      ingress:
+        hosts:
+          core: harbor.example.com
+        className: traefik
+    externalURL: https://harbor.example.com
+    persistence:
+      enabled: true
+      resourcePolicy: "keep"
+      persistentVolumeClaim:
+        registry:
+          storageClass: nfs-no-backup
+          size: 100Gi
+          accessMode: ReadWriteMany
+        jobservice:
+          jobLog:
+            storageClass: longhorn
+            size: 5Gi
+            accessMode: ReadWriteMany
+        trivy:
+          storageClass: longhorn
+          size: 5Gi
+          accessMode: ReadWriteMany
+    database:
+      type: external
+      external:
+        host: harbor-db-rw.harbor.svc.cluster.local
+        port: "5432"
+        username: app
+        coreDatabase: app
+        existingSecret: harbor-db-app
+        sslmode: "disable"
+    redis:
+      type: external
+      external:
+        addr: harbor-dragonfly.harbor.svc.cluster.local:6379
+    existingSecretAdminPassword: harbor-admin-secret
+    existingSecretAdminPasswordKey: admin_password
+    core:
+      extraEnvVars:
+        - name: CONFIG_OVERWRITE_JSON
+          valueFrom:
+            secretKeyRef:
+              name: harbor-config-overwrite
+              key: CONFIG_OVERWRITE_JSON
+    podAnnotations:
+      reloader.stakater.com/auto: "true"

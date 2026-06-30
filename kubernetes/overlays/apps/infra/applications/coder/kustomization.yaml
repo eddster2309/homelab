@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: coder
+resources:
+- ../../../../../bases/coder
+- postgres.yaml
+- oidc-secret.yaml
+- gitlab-secret.yaml
+- gitlab-registry-secret.yaml
+- binarylane-secret.yaml
+- claude-secret.yaml
+- proxmox-secret.yaml
+components:
+- ../../../../../components/ca-certs
+- ../../../../../components/cnpg-barman-backup
+patches:
+- target:
+    kind: HelmRelease
+  path: coder-patch.yaml
+- target:
+    kind: ScheduledBackup
+    name: cnpg-nightly-backup
+  patch: |
+    - op: replace
+      path: /spec/cluster/name
+      value: coder-db
+- target:
+    kind: RoleBinding
+    name: cnpg-backup-s3-reader
+  patch: |
+    - op: replace
+      path: /subjects/0/name
+      value: coder-db

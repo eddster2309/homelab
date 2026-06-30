@@ -1,0 +1,21 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cnpg-backup-s3-reader
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["cnpg-backup-s3"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: cnpg-backup-s3-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: cnpg-backup-s3-reader
+subjects:
+- kind: ServiceAccount
+  name: placeholder

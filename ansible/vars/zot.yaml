@@ -1,0 +1,51 @@
+vm_count: 1
+vm_template_id: fedora41
+
+vm_cpu_core_count: 2
+vm_memory: 8192
+vm_disk_size: 320
+
+vm_network: infra_core
+vm_start_ip: 90
+
+service_name: registry
+
+zot_cert_domains:
+  - registry.internal
+  - registry01.infra.internal
+
+zot_url: registry.internal
+
+zot_ssl_self_signed: false
+zot_ssl_cert_path: "/etc/letsencrypt/live/{{ service_name }}/fullchain.pem"
+zot_ssl_key_path: "/etc/letsencrypt/live/{{ service_name }}/privkey.pem"
+
+zot_user_accounts:
+  - username: admin
+    password: "{{ vault_zot_admin_password }}"
+
+zot_ui_enabled: true
+
+zot_registry_sync:
+  - urls:
+      - https://docker.io/library
+    content:
+      - prefix: "**"
+        destination: "/dockerio"
+    onDemand: true
+    tlsVerify: true
+  - urls:
+      - https://ghcr.io/library
+    content:
+      - prefix: "**"
+        destination: "/ghcr"
+    onDemand: true
+    tlsVerify: true
+
+zot_access_control:
+  - path: "dockerio/**"
+    anonymous:
+      - read
+  - path: "ghcr/**"
+    anonymous:
+      - read
