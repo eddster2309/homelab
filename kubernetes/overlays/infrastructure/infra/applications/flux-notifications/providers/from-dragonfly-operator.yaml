@@ -1,0 +1,9 @@
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Provider
+metadata:
+  name: notify-from-dragonfly-operator
+  namespace: flux-system
+spec:
+  type: generic
+  address: http://notification-controller.flux-system.svc.cluster.local:9292/hook/0e30bc7c2f67ae3a8d0d28c143874926fa8de157c052c0c0f91d58f7368134a6

@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: rsyslog
+  labels:
+    app: rsyslog
+spec:
+  selector:
+    matchLabels:
+      app: rsyslog
+  template:
+    metadata:
+      labels:
+        app: rsyslog
+      annotations:
+        reloader.stakater.com/auto: "true"
+    spec:
+      containers:
+        - name: rsyslog
+          image: alpine:3.21
+          command: ["/bin/sh", "-c"]
+          args: ["apk add --no-cache rsyslog rsyslog-http && rsyslogd -n -f /config/rsyslog.conf"]
+          ports:
+            - name: syslog-udp
+              containerPort: 51514
+              protocol: UDP
+            - name: syslog-tcp
+              containerPort: 51514
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: workdir
+              mountPath: /var/lib/rsyslog
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      volumes:
+        - name: config
+          configMap:
+            name: rsyslog-config
+        - name: workdir
+          emptyDir: {}

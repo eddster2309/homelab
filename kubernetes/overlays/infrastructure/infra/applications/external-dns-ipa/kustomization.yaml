@@ -1,0 +1,24 @@
+namespace: external-dns-ipa
+resources:
+  - ../../../../../bases/external-dns
+  - ./secrets
+patches: 
+  - target:
+      kind: HelmRelease
+    path: ./external-dns-patch.yaml
+  - target:
+      kind: HelmRelease
+    patch: | 
+      - op: replace
+        path: /metadata/name
+        value: external-dns-ipa
+  - target: 
+      kind: Namespace
+    patch: |
+      - op: replace
+        path: /metadata/name
+        value: external-dns-ipa
+      - op: add
+        path: /metadata/labels
+        value: 
+          app: external-dns-ipa

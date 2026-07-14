@@ -1,0 +1,6 @@
+resources:
+  - opnsense.yaml
+  - speedtest.yaml
+  - blackbox-icmp.yaml
+  - blackbox-http.yaml
+  - omada.yaml

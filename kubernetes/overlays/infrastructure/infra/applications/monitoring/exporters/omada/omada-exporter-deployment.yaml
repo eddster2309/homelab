@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: omada-exporter
+  labels:
+    app: omada-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: omada-exporter
+  template:
+    metadata:
+      labels:
+        app: omada-exporter
+      annotations:
+        reloader.stakater.com/auto: "true"
+    spec:
+      containers:
+        - name: omada-exporter
+          image: rcooler/omada_exporter:2.3.0
+          ports:
+            - name: metrics
+              containerPort: 9202
+              protocol: TCP
+          env:
+            - name: OMADA_HOST
+              value: "https://REDACTED_IP:443"
+            - name: OMADA_SITE
+              value: "Default"
+            - name: OMADA_INSECURE
+              value: "true"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: OMADA_USER
+              valueFrom:
+                secretKeyRef:
+                  name: omada-exporter-credentials
+                  key: username
+            - name: OMADA_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: omada-exporter-credentials
+                  key: password
+            - name: OMADA_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: omada-exporter-credentials
+                  key: client_id
+            - name: OMADA_SECRET_ID
+              valueFrom:
+                secretKeyRef:
+                  name: omada-exporter-credentials
+                  key: secret_id
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi

@@ -1,0 +1,51 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: longhorn-health
+spec:
+  groups:
+    - name: longhorn-health
+      rules:
+        - alert: LonghornVolumeFaulted
+          expr: longhorn_volume_robustness{state="faulted"} == 1
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Longhorn volume for {{ $labels.pvc_namespace }}/{{ $labels.pvc }} is faulted"
+            description: "Volume {{ $labels.volume }} backing {{ $labels.pvc_namespace }}/{{ $labels.pvc }} has been faulted for 2 minutes and has lost data redundancy or access."
+        - alert: LonghornVolumeDegraded
+          expr: longhorn_volume_robustness{state="degraded"} == 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Longhorn volume for {{ $labels.pvc_namespace }}/{{ $labels.pvc }} is degraded"
+            description: "Volume {{ $labels.volume }} backing {{ $labels.pvc_namespace }}/{{ $labels.pvc }} has been degraded for 5 minutes (running with fewer replicas than configured)."
+        - alert: LonghornNodeNotReady
+          expr: longhorn_node_status{condition="ready"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Longhorn node {{ $labels.node }} is not ready"
+            description: "Longhorn reports node {{ $labels.node }} as not ready for 5 minutes."
+        - alert: LonghornDiskNotReady
+          expr: longhorn_disk_status{condition="ready"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Longhorn disk {{ $labels.disk }} on {{ $labels.node }} is not ready"
+            description: "Longhorn reports disk {{ $labels.disk }} on node {{ $labels.node }} as not ready for 5 minutes."
+        - alert: LonghornBackupStale
+          expr: |
+            (longhorn_volume_last_backup_at > 0)
+            and on(volume) (longhorn_volume_robustness{state=~"healthy|degraded"} == 1)
+            and (time() - longhorn_volume_last_backup_at > 93600)
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Longhorn backup is stale for {{ $labels.pvc }}"
+            description: "Volume {{ $labels.volume }} (pvc {{ $labels.pvc }}) is attached and has not completed a successful Longhorn backup in over 26 hours (nightly schedule is 00:00)."

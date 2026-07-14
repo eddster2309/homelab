@@ -1,0 +1,29 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMStaticScrape
+metadata:
+  name: blackbox-http
+spec:
+  jobName: blackbox-http
+  targetEndpoints:
+    - path: /probe
+      targets:
+        - https://gitlab.example.com
+        - https://mealie.example.com
+        - https://karakeep.example.com
+        - https://immich.example.com
+        - https://coder.0b.au
+        - https://paperless.example.com
+        - https://netbox.example.com
+        - https://outline.example.com
+        - https://harbor.example.com
+        - https://gotify.example.com
+        - https://auth.example.com
+      params:
+        module: [http_2xx]
+      relabelConfigs:
+        - sourceLabels: [__address__]
+          targetLabel: __param_target
+        - sourceLabels: [__param_target]
+          targetLabel: instance
+        - targetLabel: __address__
+          replacement: blackbox-exporter-prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115

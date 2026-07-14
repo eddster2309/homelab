@@ -1,0 +1,32 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: paperless-ngx
+resources:
+- ../../../../../bases/paperless-ngx
+- ./database
+- ./oidc-secret.yaml
+- ./smtp-secret.yaml
+- ./tika-release.yaml
+- ./gotenberg-release.yaml
+components:
+- ../../../../../components/ca-certs
+- ../../../../../components/cnpg-barman-backup
+patches:
+- target:
+    kind: HelmRelease
+    name: paperless-ngx
+  path: paperless-ngx-patch.yaml
+- target:
+    kind: ScheduledBackup
+    name: cnpg-nightly-backup
+  patch: |
+    - op: replace
+      path: /spec/cluster/name
+      value: paperless-ngx-db
+- target:
+    kind: RoleBinding
+    name: cnpg-backup-s3-reader
+  patch: |
+    - op: replace
+      path: /subjects/0/name
+      value: paperless-ngx-db

@@ -1,0 +1,27 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tempo
+spec:
+  chart:
+    spec:
+      version: "1.24.4"
+  values:
+    persistence:
+      enabled: true
+      storageClassName: longhorn
+      size: 10Gi
+    serviceMonitor:
+      enabled: true
+    podAnnotations:
+      reloader.stakater.com/auto: "true"
+    tempo:
+      metricsGenerator:
+        enabled: true
+        remoteWriteUrl: "http://vminsert-vicmetrics-victoria-metrics-k8s-stack.monitoring.svc.cluster.local:8480/insert/0/prometheus/api/v1/write"
+      overrides:
+        defaults:
+          metrics_generator:
+            processors:
+              - service-graphs
+              - span-metrics

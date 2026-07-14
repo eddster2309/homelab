@@ -1,0 +1,49 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: netbox
+resources:
+- ../../../../../bases/netbox
+- ./database
+- ./oidc-secret.yaml
+- ./secrets/proxbox-config.yaml
+- ./secrets/api-token-peppers.yaml
+- ./superuser-secret.yaml
+- ./sso-pipeline-configmap.yaml
+- ./smtp-secret.yaml
+configMapGenerator:
+- name: opnsense-sync-script
+  files:
+  - scripts/opnsense_sync.py
+  options:
+    disableNameSuffixHash: true
+- name: proxmox-sync-script
+  files:
+  - scripts/proxmox_sync.py
+  options:
+    disableNameSuffixHash: true
+- name: netbox-register-scripts
+  files:
+  - scripts/register_scripts.py
+  options:
+    disableNameSuffixHash: true
+components:
+- ../../../../../components/cnpg-barman-backup
+patches:
+- target:
+    kind: HelmRelease
+    name: netbox
+  path: netbox-patch.yaml
+- target:
+    kind: ScheduledBackup
+    name: cnpg-nightly-backup
+  patch: |
+    - op: replace
+      path: /spec/cluster/name
+      value: netbox-db
+- target:
+    kind: RoleBinding
+    name: cnpg-backup-s3-reader
+  patch: |
+    - op: replace
+      path: /subjects/0/name
+      value: netbox-db

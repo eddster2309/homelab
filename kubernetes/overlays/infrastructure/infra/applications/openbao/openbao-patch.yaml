@@ -1,0 +1,91 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: openbao
+  namespace: openbao
+spec:
+  chart:
+    spec:
+      chart: openbao
+      version: "0.28.4"
+      sourceRef:
+        kind: HelmRepository
+        name: openbao
+        namespace: flux-system
+  values:
+    global:
+      enabled: true
+      tlsDisable: true  # TLS terminated at the traefik ingress
+
+    # We use External Secrets Operator, not the OpenBao Agent Injector.
+    injector:
+      enabled: false
+
+    ui:
+      enabled: true
+      serviceType: ClusterIP
+
+    server:
+      # NOTE: reloader auto-restart is deliberately NOT enabled here. This OpenBao
+      # is manually unsealed, so an automatic pod cycle would re-seal every node.
+      dataStorage:
+        enabled: true
+        size: 10Gi
+        storageClass: longhorn
+        accessMode: ReadWriteOnce
+
+      # Raft needs to spread across nodes; keep the pods apart.
+      affinity: |
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: {{ template "openbao.name" . }}
+                  app.kubernetes.io/instance: "{{ .Release.Name }}"
+                  component: server
+              topologyKey: kubernetes.io/hostname
+
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
+        limits:
+          memory: 512Mi
+
+      ha:
+        enabled: true
+        replicas: 3
+        raft:
+          enabled: true
+          setNodeId: true
+          config: |
+            ui = true
+
+            listener "tcp" {
+              tls_disable = 1
+              address = "[::]:8200"
+              cluster_address = "[::]:8201"
+            }
+
+            storage "raft" {
+              path = "/openbao/data"
+              retry_join {
+                leader_api_addr = "http://openbao-0.openbao-internal:8200"
+              }
+              retry_join {
+                leader_api_addr = "http://openbao-1.openbao-internal:8200"
+              }
+              retry_join {
+                leader_api_addr = "http://openbao-2.openbao-internal:8200"
+              }
+            }
+
+            service_registration "kubernetes" {}
+
+      ingress:
+        enabled: true
+        ingressClassName: traefik
+        hosts:
+          - host: openbao.example.com
+            paths:
+              - /

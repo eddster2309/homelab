@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: outline
+resources:
+- ../../../../../bases/outline
+- ./database
+- ./oidc-secret.yaml
+- ./app-secret.yaml
+components:
+- ../../../../../components/cnpg-barman-backup
+patches:
+- target:
+    kind: HelmRelease
+    name: outline
+  path: outline-patch.yaml
+- target:
+    kind: ScheduledBackup
+    name: cnpg-nightly-backup
+  patch: |
+    - op: replace
+      path: /spec/cluster/name
+      value: outline-db
+- target:
+    kind: RoleBinding
+    name: cnpg-backup-s3-reader
+  patch: |
+    - op: replace
+      path: /subjects/0/name
+      value: outline-db

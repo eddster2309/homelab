@@ -1,0 +1,155 @@
+- name: Create HBAC Rule for IPA Admins to access any
+  freeipa.ansible_freeipa.ipahbacrule:
+    name: "admins_allow_all"
+    group:
+      - admins
+    hostcategory: all
+    servicecategory: all
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+
+- name: Create IPA privileges
+  freeipa.ansible_freeipa.ipaprivilege:
+    name: "{{ item.name }}"
+    permission: "{{ item.permission }}"
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  loop: "{{ ipa_privileges }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Create IPA roles
+  freeipa.ansible_freeipa.iparole:
+    name: "{{ item.name }}"
+    privilege: "{{ item.privilege }}"
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  loop: "{{ ipa_roles }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Create Service Account Group
+  freeipa.ansible_freeipa.ipagroup:
+    name: svc_accounts
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+
+- name: Create User Groups
+  freeipa.ansible_freeipa.ipagroup:
+    name: "{{ item.name }}"
+    description: "{{ item.description | default('Created by Ansible') }}"
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  loop: "{{ ipa_groups | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Add Groups to Groups
+  freeipa.ansible_freeipa.ipagroup:
+    name: "{{ item.1 }}"
+    group: "{{ item.0.name }}"
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  loop: "{{ query('subelements', ipa_groups, 'groups', {'skip_missing': True}) }}"
+  loop_control:
+    label: "{{ item.0.name }} added to {{ item.1 }}"
+
+- name: Create Host Groups
+  freeipa.ansible_freeipa.ipahostgroup:
+    name: "{{ item.name }}"
+    description: "{{ item.description | default('Created by Ansible') }}"
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  loop: "{{ ipa_host_groups }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Create HBAC Rules
+  freeipa.ansible_freeipa.ipahbacrule:
+    name: "{{ item.name }}"
+    description: "{{ item.description | default('Created by Ansible') }}"
+    hostgroup: "{{ item.host_groups }}"
+    group: "{{ item.groups }}"
+    hbacsvc:
+      - sshd
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  loop: "{{ ipa_hbac_rules }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Add Groups to roles
+  freeipa.ansible_freeipa.iparole:
+    name: "{{ item.1 }}"
+    group: "{{ item.0.name }}"
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  loop: "{{ query('subelements', ipa_groups, 'roles', {'skip_missing': True}) }}"
+  loop_control:
+    label: "{{ item.0.name }} added to {{ item.1 }}"
+
+- name: Create Service Accounts
+  freeipa.ansible_freeipa.ipauser:
+    name: "{{ item.name }}"
+    first: "{{ item.name }} Service Account"
+    last: "{{ item.name }} Service Account"
+    password: "{{ item.password }}"
+    displayname: "{{ item.name }} Service Account"
+    fullname: "{{ item.name }} Service Account"
+    ipaadmin_password: "{{ ipaadmin_password }}"
+    passwordexpiration: "20990101110000"
+    state: present
+    sshpubkey: "{{ item.ssh_pub_key | default(omit) }}"
+  loop: "{{ ipa_svc_accounts }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Add Service Accounts to svc_accounts Group
+  freeipa.ansible_freeipa.ipagroup:
+    name: svc_accounts
+    user: "{{ item.name }}"
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  loop: "{{ ipa_svc_accounts }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Add Service Accounts to Group
+  freeipa.ansible_freeipa.ipagroup:
+    name: svc_accounts
+    user: "{{ item.name }}"
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  loop: "{{ ipa_svc_accounts }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Remove Service Accounts from ipausers Group
+  freeipa.ansible_freeipa.ipagroup:
+    name: ipausers
+    action: member
+    user: "{{ item.name }}"
+    state: absent
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  loop: "{{ ipa_svc_accounts }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Add Service Accounts to IPA Groups
+  freeipa.ansible_freeipa.ipagroup:
+    name: "{{ item.1 }}"
+    user: "{{ item.0.name }}"
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  loop: "{{ query('subelements', ipa_svc_accounts, 'groups', {'skip_missing': True}) }}"
+  loop_control:
+    label: "{{ item.0.name }} added to {{ item.1 }}"
+
+- name: Create automember rules
+  freeipa.ansible_freeipa.ipaautomember:
+    name: "{{ item.name }}"
+    description: "{{ item.description | default('created by ansible') }}"
+    automember_type: "{{ item.automember_type }}"
+    inclusive: "{{ item.inclusive | default([]) }}"
+    exclusive: "{{ item.exclusive | default([]) }}"
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  loop: "{{ ipa_automember_rules }}"

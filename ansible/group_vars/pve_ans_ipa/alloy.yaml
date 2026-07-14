@@ -1,0 +1,12 @@
+alloy_extra_config: |
+  local.file_match "ipa_files" {
+    path_targets = [{"__path__" = "/var/log/dirsrv/**/access"},
+                    {"__path__" = "/var/log/dirsrv/**/error"}]
+    sync_period = "5s"
+  }
+
+  loki.source.file "log_scrape_ipa" {
+    targets    = local.file_match.ipa_files.targets
+    forward_to = [loki.process.global_labels.receiver]
+    tail_from_end = true
+  }
