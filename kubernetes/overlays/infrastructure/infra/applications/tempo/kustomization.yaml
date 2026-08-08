@@ -1,0 +1,9 @@
+namespace: tempo
+resources:
+- ../../../../../bases/tempo
+- ./tempo-ingress.yaml
+patches:
+- target:
+    kind: HelmRelease
+    name: tempo
+  path: ./tempo-patch.yaml

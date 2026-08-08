@@ -1,0 +1,4 @@
+location /{{ item.name }}/ {
+    proxy_pass {{ item.url }};
+    proxy_set_header Host "{{ item.url | urlsplit('hostname') }}";
+}

@@ -1,0 +1,48 @@
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log notice;
+pid /run/nginx.pid;
+
+# Load dynamic modules. See /usr/share/doc/nginx/README.dynamic.
+include /usr/share/nginx/modules/*.conf;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    sendfile            on;
+    tcp_nopush          on;
+    keepalive_timeout   65;
+    types_hash_max_size 4096;
+
+    include             /etc/nginx/mime.types;
+    default_type        application/octet-stream;
+
+    proxy_cache_path {{ configure_repos_cache_root }} levels=2:2 keys_zone=generic:500m inactive=3650d max_size=1000g min_free=5g loader_files=1000 loader_sleep=50ms loader_threshold=300ms use_temp_path=off;
+    
+    log_format cachelog escape=json '{"time_local":"$time_iso8601","remote_addr":"$remote_addr","request_uri": "$request_uri", "request_method": "$request_method", "status":"$status","http_user_agent":"$http_user_agent","upstream_cache_status":"$upstream_cache_status", "body_bytes_sent": "$body_bytes_sent", "request_time": "$request_time", "upstream_response_time": "$upstream_response_time", "upstream_addr": "$upstream_addr", "upstream_http_server": "$upstream_http_server"}';
+
+    map $request_uri $nocache {
+        ~InRelease 1;
+        ~Release 1;
+        ~Packages 0;
+        ~repomd.xml 1;
+    }
+
+    server {
+        listen       80;
+        listen       [::]:80;
+        root         /usr/share/nginx/html;
+    
+        server_name {{ ansible_fqdn }} {{ mirror_subdomain }};
+    
+        include /etc/nginx/default.d/*.conf;
+
+        access_log {{ configure_repos_log_root }}/access.log cachelog;
+        error_log {{ configure_repos_log_root }}/error.log;
+    } 
+
+    include {{ configure_repos_vhosts_root }}/*.conf;
+
+}

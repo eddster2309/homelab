@@ -1,0 +1,12 @@
+apiVersion: console.openshift.io/v1
+kind: ConsoleLink
+metadata:
+  name: cilium-hubble-link
+spec:
+  href: 'https://cilium.example.com'
+  location: ApplicationMenu
+  text: Hubble - Cilium Observability Dashboard
+  applicationMenu:
+    section: Kubernetes Tools
+    # image that is 24x24 in size
+    imageURL: https://avatars.githubusercontent.com/u/21054566?s=280&v=4

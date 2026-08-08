@@ -1,0 +1,20 @@
+# Faro Web SDK collector endpoint. Intentionally has no Authelia middleware:
+# browsers POST telemetry here anonymously, there's no interactive session to
+# authenticate.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: faro-collector
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: faro.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: k8s-monitoring-receiver-collector
+                port:
+                  number: 12347

@@ -1,0 +1,9 @@
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Provider
+metadata:
+  name: notify-from-traefik
+  namespace: flux-system
+spec:
+  type: generic
+  address: http://notification-controller.flux-system.svc.cluster.local:9292/hook/617a31b7d8afa8ef6e5b27a0d829d71b4ee333ad0ef9b510eda38b61712160c0

@@ -1,0 +1,35 @@
+# Cache Location
+slice 1m;
+proxy_cache generic;
+proxy_ignore_headers Expires Cache-Control;
+proxy_cache_valid 200 206 3650d;
+proxy_cache_valid 301 302 0;
+proxy_set_header  Range $slice_range;
+proxy_cache_lock on;
+proxy_cache_lock_age 2m;
+proxy_cache_lock_timeout 1h;
+proxy_cache_use_stale error timeout invalid_header updating http_500 http_502 http_503 http_504;
+proxy_cache_revalidate on;
+#Nocache for those entries
+proxy_cache_bypass $nocache;
+proxy_no_cache $nocache;
+# 1G max file
+proxy_max_temp_file_size 1024m;
+# Cache key
+proxy_cache_key      $http_host$uri$slice_range;
+# Upstream Configuration
+proxy_next_upstream error timeout http_404;
+# Cache status
+add_header X-Cache-Status $upstream_cache_status;
+proxy_redirect off;
+proxy_ignore_client_abort on;
+# Upstream request headers
+proxy_ssl_server_name on;
+
+# Redirect Locations
+# Must include trailing slash!
+
+# Stats endpoint
+location = /nginx_status {
+    stub_status;
+}

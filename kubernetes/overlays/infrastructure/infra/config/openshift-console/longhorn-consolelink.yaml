@@ -1,0 +1,12 @@
+apiVersion: console.openshift.io/v1
+kind: ConsoleLink
+metadata:
+  name: longhorn-link
+spec:
+  href: 'https://longhorn.example.com'
+  location: ApplicationMenu
+  text: Longhorn UI - Longhorn storage management console
+  applicationMenu:
+    section: Kubernetes Tools
+    # image that is 24x24 in size
+    imageURL: https://avatars.githubusercontent.com/u/51335366?v=4

@@ -1,0 +1,4 @@
+namespace: monitoring
+resources:
+- loki.yaml
+- tempo.yaml

@@ -1,0 +1,10 @@
+namespace: traefik
+resources:
+  - ../../../../../bases/traefik
+  - secretstore.yaml
+  - authelia-middleware.yaml
+patches:
+  - target:
+      kind: HelmRelease
+      name: traefik
+    path: ./traefik-patch.yaml

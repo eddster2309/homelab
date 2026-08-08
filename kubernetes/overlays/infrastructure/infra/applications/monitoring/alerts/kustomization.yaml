@@ -1,0 +1,5 @@
+resources:
+  - internet-connectivity.yaml
+  - web-services-down.yaml
+  - cnpg-health.yaml
+  - longhorn-health.yaml
