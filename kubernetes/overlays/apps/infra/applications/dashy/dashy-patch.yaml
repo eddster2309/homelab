@@ -1,0 +1,146 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: dashy
+spec:
+  values:
+    image:
+      tag: 4.5.0
+    replicaCount: 2
+    resources:
+      requests:
+        cpu: 10m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+    ingress:
+      enabled: true
+      className: traefik
+      hosts:
+        - host: dashy.example.com
+          paths:
+            - path: /
+              pathType: ImplementationSpecific
+    podAnnotations:
+      reloader.stakater.com/auto: "true"
+    static:
+      configMapContent:
+        conf: |-
+          pageInfo:
+            title: "Eddster Homelab"
+            navLinks:
+              - title: "Homelab Repo"
+                url: "https://github.com/eddster2309/homelab-infra"
+          appConfig:
+            hideComponents:
+              hideNav: true
+              hideSearch: true
+              hideSettings: true
+              hideFooter: true
+            disableConfiguration: true
+            preventLocalSave: true
+            preventWriteToDisk: true
+            disableContextMenu: true
+          sections:
+            - name: "Apps"
+              items:
+                - title: "Coder"
+                  type: "link"
+                  url: "https://coder.0b.au"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/visual-studio-code-dark.svg"
+                - title: "Paperless-ngx"
+                  type: "link"
+                  url: "https://paperless.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/paperless-ngx.svg"
+                - title: "GitLab"
+                  type: "link"
+                  url: "https://gitlab.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/gitlab.svg"
+                - title: "Harbor"
+                  type: "link"
+                  url: "https://harbor.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/harbor.svg"
+                - title: "Immich"
+                  type: "link"
+                  url: "https://immich.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/immich.svg"
+                - title: "Mealie"
+                  type: "link"
+                  url: "https://mealie.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/mealie.svg"
+                - title: "Karakeep"
+                  type: "link"
+                  url: "https://karakeep.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/karakeep.svg"
+                - title: "Outline"
+                  type: "link"
+                  url: "https://outline.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/outline.svg"
+                - title: "NetBox"
+                  type: "link"
+                  url: "https://netbox.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/netbox.svg"
+                - title: "Home Assistant"
+                  type: "link"
+                  url: "https://home.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/home-assistant.svg"
+                - title: Frigate
+                  type: "link"
+                  url: "https://cctv.0b.au"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/frigate.svg"
+            - name: "Monitoring"
+              items:
+                - title: "Grafana"
+                  type: "link"
+                  url: "https://grafana.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/grafana.svg"
+                - title: "Victoria Metrics"
+                  type: "link"
+                  url: "https://vm-agent.example.com/"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/victoriametrics.svg"
+            - name: Kubernetes Management
+              items:
+                - title: "Headlamp"
+                  type: "link"
+                  url: "https://headlamp.0b.au"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/headlamp.svg"
+                - title: "Longhorn"
+                  type: "link"
+                  url: "https://longhorn.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/longhorn.svg"
+                - title: "Cilium"
+                  type: "link"
+                  url: "https://cilium.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/cilium.svg"
+            - name: Network and Hardware Management
+              items:
+                - title: Proxmox VE
+                  type: "link"
+                  url: "https://REDACTED_IP:8006"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/proxmox.svg"
+                - title: Omada
+                  type: "link"
+                  url: "https://REDACTED_IP"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/tp-link-omada.svg"
+                - title: OPNSense
+                  type: "link"
+                  url: "https://REDACTED_IP"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/opnsense.svg"
+                - title: IPA1
+                  type: "link"
+                  url: "https://ipa01.internal/ipa/ui/"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/freeipa.svg"
+                - title: TrueNAS
+                  type: "link"
+                  url: "https://REDACTED_IP"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/truenas.svg"
+                - title: Vault
+                  type: "link"
+                  url: "https://vault01.infra.internal"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/hashicorp-vault.svg"
+                - title: OpenBao
+                  type: "link"
+                  url: "https://openbao.example.com"
+                  icon: "https://cdn.jsdelivr.net/gh/selfhst/icons/svg/openbao.svg"
+

@@ -1,0 +1,11 @@
+- name: Login using svc account
+  community.hashi_vault.vault_login:
+    url: "{{ vault_internal_url }}"
+    auth_method: userpass
+    username: "{{ vault_svc_account_name }}"
+    password: '{{ vault_svc_account_password }}'
+  register: login_data
+
+- name: Set Vault token variable
+  ansible.builtin.set_fact:
+    vault_auth_token: "{{ login_data.login.auth.client_token }}"

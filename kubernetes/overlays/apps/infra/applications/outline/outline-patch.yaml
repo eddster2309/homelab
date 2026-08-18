@@ -1,0 +1,56 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: outline
+spec:
+  values:
+    controllers:
+      outline:
+        containers:
+          app:
+            env:
+              URL: https://outline.example.com
+              DATABASE_URL:
+                secretKeyRef:
+                  name: outline-db-app
+                  key: uri
+              REDIS_URL: redis://outline-dragonfly.outline.svc.cluster.local:6379
+              OIDC_CLIENT_ID: outline
+              OIDC_AUTH_URI: https://auth.example.com/api/oidc/authorization
+              OIDC_TOKEN_URI: https://auth.example.com/api/oidc/token
+              OIDC_USERINFO_URI: https://auth.example.com/api/oidc/userinfo
+              OIDC_LOGOUT_URI: https://auth.example.com/logout
+              OIDC_USERNAME_CLAIM: preferred_username
+              OIDC_DISPLAY_NAME: Authelia
+              OIDC_SCOPES: openid profile email
+              FILE_STORAGE: local
+              FILE_STORAGE_LOCAL_ROOT_DIR: /var/lib/outline/data
+              FILE_STORAGE_UPLOAD_MAX_SIZE: "262144000"
+            envFrom:
+              - secretRef:
+                  name: oidc-secret
+              - secretRef:
+                  name: app-secret
+    defaultPodOptions:
+      annotations:
+        reloader.stakater.com/auto: "true"
+    persistence:
+      data:
+        enabled: true
+        retain: true
+        globalMounts:
+          - path: /var/lib/outline/data
+        size: 20Gi
+        storageClass: longhorn
+        accessMode: ReadWriteOnce
+    ingress:
+      app:
+        enabled: true
+        className: traefik
+        hosts:
+          - host: outline.example.com
+            paths:
+              - path: /
+                service:
+                  identifier: app
+                  port: http

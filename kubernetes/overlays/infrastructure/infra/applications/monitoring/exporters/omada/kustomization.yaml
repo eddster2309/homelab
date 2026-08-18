@@ -1,0 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- omada-exporter-deployment.yaml
+- omada-exporter-service.yaml
+- omada-exporter-secret.yaml

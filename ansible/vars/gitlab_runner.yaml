@@ -1,0 +1,37 @@
+vm_count: 3
+vm_template_id: fedora41
+
+vm_cpu_core_count: 4
+vm_memory: 8192
+vm_disk_size: 100
+
+vm_network: dmz
+vm_start_ip: 20
+
+service_name: gitlab-runner
+
+gitlab_runner_svc_user: svc_gitlab_admin
+gitlab_runner_password: "{{ svc_gitlab_admin_password }}"
+
+gitlab_runner_gitlab_url: "https://gitlab.example.com"
+
+gitlab_runner_concurrent: 4
+
+gitlab_runner_coordinator_url: "{{ gitlab_runner_gitlab_url }}"
+
+gitlab_runner_runners:
+  - name: "{{ inventory_hostname }}"
+    state: present
+    executor: docker
+    docker_image: "debian:bookworm-slim"
+    tags:
+      - docker
+    run_untagged: true
+    cache_type: s3
+    cache_shared: true
+    cahce_s3_server_address: "https://s3.example.com"
+    cache_s3_access_key: "{{ gitlab_runner_cache_key }}"
+    cache_s3_secret_key: "{{ gitlab_runner_cache_secret }}"
+    cache_s3_bucket_name: "rke-gitlab-runner-cache"
+    cache_s3_bucket_location: "us-east-1"
+    token: "{{ runner_config.result.token }}"

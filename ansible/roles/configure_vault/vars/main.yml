@@ -1,0 +1,18 @@
+---
+# vars file for configure_vault
+configure_vault_default_policies:
+  - name: admin
+    rules:
+      - path: "*"
+        capabilities:
+          - create
+          - read
+          - update
+          - delete
+          - list
+          - sudo
+          - patch
+
+configure_vault_protected_policies:
+  - default
+  - root

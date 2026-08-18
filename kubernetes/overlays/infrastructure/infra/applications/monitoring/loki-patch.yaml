@@ -1,0 +1,163 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: loki
+  namespace: monitoring
+spec:
+  chart:
+    spec:
+      version: "17.1.5"
+  values:
+    global:
+      extraEnvFrom:
+        - secretRef:
+            name: s3-creds
+      dnsService: "rke2-coredns-rke2-coredns"
+    loki:
+      commonConfig:
+        replication_factor: 1
+      schemaConfig:
+        configs:
+          - from: "2024-04-01"
+            store: tsdb
+            object_store: s3
+            schema: v13
+            index:
+              prefix: loki_index_
+              period: 24h
+      ingester:
+        chunk_encoding: zstd
+        # Flush chunks sooner so fewer are held in memory (defaults: 30m / 2h)
+        chunk_idle_period: 15m
+        max_chunk_age: 1h
+      querier:
+        # Default is 4, if you have enough memory and CPU you can increase, reduce if OOMing
+        max_concurrent: 2
+      pattern_ingester:
+        enabled: true
+      limits_config:
+        retention_period: 336h
+        max_query_lookback: 336h
+        allow_structured_metadata: true
+        volume_enabled: true
+      compactor:
+        retention_enabled: true
+        delete_request_store: s3
+      auth_enabled: false
+      storage_config:
+        aws:
+          region: us-east-1
+          # bucketnames: rke-loki-chunks
+          s3forcepathstyle: false
+          s3: "s3://${S3_ACCESS_KEY_ID}:${S3_ACCESS_SECRET_KEY}@s3.internal/rke-loki-chunks"
+      storage:
+        type: s3
+        bucketNames:
+          chunks: rke-loki-chunks
+          ruler: rke-loki-ruler
+          admin: rke-loki-admin
+        s3:
+          endpoint: s3.internal
+          region: us-east-1
+          secretAccessKey: ${S3_ACCESS_SECRET_KEY}
+          accessKeyId: ${S3_ACCESS_KEY_ID}
+          signatureVersion: "v4"
+
+    monitoring:
+      dashboards:
+        enabled: true
+      rules:
+        enabled: true
+      serviceMonitor:
+        enabled: true
+    # deploymentMode: Distributed
+
+    deploymentMode: Monolithic
+
+    singleBinary:
+      replicas: 1
+      extraArgs:
+        - -config.expand-env=true
+      extraEnv:
+        # Make the Go GC keep heap under ~3.4Gi so RSS stays near the 4Gi limit
+        - name: GOMEMLIMIT
+          value: "3400MiB"
+      resources:
+        requests:
+          cpu: 500m
+          memory: 2Gi
+        limits:
+          memory: 4Gi
+      persistence:
+        size: 20Gi
+    
+    lokiCanary:
+      enabled: true
+      kind: Deployment
+      replicas: 1
+
+    # Zero out replica counts of other deployment modes
+    backend:
+      replicas: 0
+    read:
+      replicas: 0
+    write:
+      replicas: 0
+
+    ingester:
+      replicas: 0
+    querier:
+      replicas: 0
+    queryFrontend:
+      replicas: 0
+    queryScheduler:
+      replicas: 0
+    distributor:
+      replicas: 0
+    compactor:
+      replicas: 0
+    indexGateway:
+      replicas: 0
+    bloomPlanner:
+      replicas: 0
+    bloomBuilder:
+      replicas: 0
+    bloomGateway:
+      replicas: 0
+
+    # This exposes the Loki gateway so it can be written to and queried externaly
+    gateway:
+      replicas: 1
+      ingress:
+        enabled: true
+        ingressClassName: traefik
+        hosts:
+          - host: loki.example.com
+            paths:
+              - path: /
+                pathType: ImplementationSpecific
+          - host: monitoring.example.com
+            paths:
+              - path: /loki
+                pathType: ImplementationSpecific
+
+    chunksCache:
+      # Default is ~9.8Gi — reduced for homelab
+      allocatedMemory: 512
+      resources:
+        requests:
+          memory: 600Mi
+        limits:
+          memory: 600Mi
+
+    resultsCache:
+      # Default is ~1.2Gi — reduced for homelab
+      allocatedMemory: 128
+      resources:
+        requests:
+          memory: 200Mi
+        limits:
+          memory: 200Mi
+
+    minio:
+      enabled: false

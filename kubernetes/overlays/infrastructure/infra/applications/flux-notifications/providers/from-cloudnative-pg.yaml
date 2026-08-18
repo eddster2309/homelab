@@ -1,0 +1,9 @@
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Provider
+metadata:
+  name: notify-from-cloudnative-pg
+  namespace: flux-system
+spec:
+  type: generic
+  address: http://notification-controller.flux-system.svc.cluster.local:9292/hook/6ad1922c1ddeffdfac2b7a7e60a491a9d8c0c7343a867bed7e7fa1ed02408f33

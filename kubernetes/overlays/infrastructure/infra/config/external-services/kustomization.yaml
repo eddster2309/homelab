@@ -1,0 +1,7 @@
+namespace: default
+resources:
+  - home-assistant.yaml
+  - frigate.yaml
+  - kasm.yaml
+  - ollama.yaml
+  - insecure-transport.yaml

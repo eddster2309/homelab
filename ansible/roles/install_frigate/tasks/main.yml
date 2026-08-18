@@ -1,0 +1,30 @@
+---
+# tasks file for install_frigate
+- name: Install required packages
+  ansible.builtin.package:
+    name:
+      - vlan
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg2
+      - software-properties-common
+      - intel-media-va-driver
+    state: present
+
+- name: Configure VLAN interfaces
+  ansible.builtin.template:
+    src: vlan_interfaces.j2
+    dest: /etc/network/interfaces.d/cctv_interface
+    mode: '0644'
+    owner: root
+    group: root
+  notify: Restart networking
+
+- name: Install Docker Engine
+  ansible.builtin.include_tasks:
+    file: install_docker.yml
+
+- name: Configure Frigate
+  ansible.builtin.include_tasks:
+    file: configure_frigate.yml

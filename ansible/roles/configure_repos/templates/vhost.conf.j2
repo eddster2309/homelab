@@ -1,0 +1,16 @@
+server {
+    listen       80;
+    listen       [::]:80;
+
+    server_name {{ item.name }}.{{ mirror_subdomain }};
+
+    include /etc/nginx/default.d/*.conf;
+
+    access_log {{ configure_repos_log_root }}/access.log cachelog;
+    error_log {{ configure_repos_log_root }}/error.log;
+
+    location / {
+        proxy_pass {{ item.url }};
+        proxy_set_header Host "{{ item.url | urlsplit('hostname') }}";
+    }
+} 

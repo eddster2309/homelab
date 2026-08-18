@@ -1,0 +1,23 @@
+---
+# tasks file for host_config
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ ansible_hostname }}.{{ dns_zone }}"
+
+- name: Disable IPv6
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: 1
+    state: present
+    reload: true
+  loop:
+    - net.ipv6.conf.all.disable_ipv6
+    - net.ipv6.conf.default.disable_ipv6
+    - net.ipv6.conf.eth0.disable_ipv6
+
+- name: Enable Lo IPv6
+  ansible.posix.sysctl:
+    name: "net.ipv6.conf.lo.disable_ipv6"
+    value: 0
+    state: present
+    reload: true
