@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: umami
+resources:
+- ../../../../../bases/umami
+- ./database
+- ./app-secret.yaml
+components:
+- ../../../../../components/cnpg-barman-backup
+patches:
+- target:
+    kind: HelmRelease
+    name: umami
+  path: umami-patch.yaml
+- target:
+    kind: ScheduledBackup
+    name: cnpg-nightly-backup
+  patch: |
+    - op: replace
+      path: /spec/cluster/name
+      value: umami-db
+- target:
+    kind: RoleBinding
+    name: cnpg-backup-s3-reader
+  patch: |
+    - op: replace
+      path: /subjects/0/name
+      value: umami-db

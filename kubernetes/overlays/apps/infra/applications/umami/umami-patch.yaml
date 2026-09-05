@@ -1,0 +1,40 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: umami
+spec:
+  values:
+    controllers:
+      umami:
+        containers:
+          app:
+            env:
+              # CNPG publishes the full connection string on the -app secret it
+              # generates for the cluster. Prisma migrations run on startup.
+              DATABASE_URL:
+                valueFrom:
+                  secretKeyRef:
+                    name: umami-db-app
+                    key: uri
+            envFrom:
+              - secretRef:
+                  name: app-secret
+    defaultPodOptions:
+      annotations:
+        reloader.stakater.com/auto: "true"
+    ingress:
+      app:
+        enabled: true
+        className: traefik
+        annotations:
+          # Authelia forward-auth in front of the dashboard. The tracker
+          # scripts and /api/send are bypassed in Authelia's ACL so browsers on
+          # tracked sites can still collect — see config.acl.yaml.
+          traefik.ingress.kubernetes.io/router.middlewares: traefik-authelia@kubernetescrd
+        hosts:
+          - host: umami.0b.au
+            paths:
+              - path: /
+                service:
+                  identifier: app
+                  port: http

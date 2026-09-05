@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource-configmap-asher-loki
+  labels:
+     grafana_datasource: "1"
+data:
+  asher-loki.yaml: |-
+    apiVersion: 1
+    datasources:
+      - name: Loki - Asher
+        type: loki
+        access: proxy
+        # Straight to the gateway in-cluster; queries do not go through vmauth.
+        url: http://loki-gateway.monitoring.svc.cluster.local:80
+        isDefault: false
+        jsonData:
+          httpHeaderName1: 'X-Scope-OrgID'
+        secureJsonData:
+          httpHeaderValue1: 'asher'

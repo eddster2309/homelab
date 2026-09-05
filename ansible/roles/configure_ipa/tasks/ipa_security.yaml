@@ -1,0 +1,34 @@
+- name: Disable LDAP Anonymous Bind
+  community.general.ldap_attrs:
+    dn: "cn=config"
+    attributes:
+      nsslapd-allow-anonymous-access: "rootdse"
+    state: exact
+    server_uri: "ldap://{{ item }}:389"
+    bind_dn: "cn=Directory Manager"
+    bind_pw: "{{ ipadm_password }}"
+    validate_certs: false
+    start_tls: true
+  with_inventory_hostnames:
+    - "{{ ipa_server_ansible_group_name }}"
+
+- name: Remove Default Self Service policy
+  freeipa.ansible_freeipa.ipaselfservice:
+    name: "User Self Service"
+    state: absent
+    ipaadmin_password: "{{ ipaadmin_password }}"
+
+- name: Create Self Service policy
+  freeipa.ansible_freeipa.ipaselfservice:
+    name: "Custom User Self Service"
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+    action: selfservice
+    attribute:
+      - manager
+
+- name: Disable Default Allow All rule
+  freeipa.ansible_freeipa.ipahbacrule:
+    name: "allow_all"
+    state: disabled
+    ipaadmin_password: "{{ ipaadmin_password }}"

@@ -1,0 +1,20 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: ingress-nginx
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  path: ./kubernetes/overlays/infrastructure/infra/applications/ingress-nginx
+  prune: true
+  dependsOn: 
+    - name: repositories-infra
+    - name: cilium
+  healthChecks:
+    - kind: HelmRelease
+      name: ingress-nginx
+      namespace: ingress-nginx
+      apiVersion: helm.toolkit.fluxcd.io/v2beta1
+  sourceRef:
+    kind: "GitRepository"
+    name: "flux-system"

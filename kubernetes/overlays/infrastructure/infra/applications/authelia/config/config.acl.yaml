@@ -1,0 +1,96 @@
+access_control:
+  default_policy: 'deny'
+  networks:
+  - name: 'internal'
+    networks:
+    - 'REDACTED_IP/8'
+    - 'REDACTED_IP/12'
+    - 'REDACTED_IP/16'
+  - name: 'core'
+    networks:
+    - 'REDACTED_IP/24'
+  rules:
+  - domain: 'traefik.0b.au'
+    policy: 'one_factor'
+    networks:
+    - 'internal'
+    subject:
+    - ['group:k8s-infra-traefik-access']
+  - domain: 'longhorn.0b.au'
+    policy: 'one_factor'
+    networks:
+    - 'internal'
+    subject:
+    - ['group:k8s-infra-longhorn-access']
+  - domain: 'cilium.0b.au'
+    policy: 'one_factor'
+    networks:
+    - 'internal'
+    subject:
+    - ['group:k8s-infra-cilium-access']
+  - domain: 'whoami.0b.au'
+    policy: 'one_factor'
+    networks:
+    - 'internal'
+  - domain: 'cctv.0b.au'
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-cctv-access']
+    networks:
+    - 'internal'
+  - domain: 'vm-agent.0b.au'
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-monitor-vm-agent-access']
+    networks:
+    - 'internal'
+  - domain: 'grafana.0b.au'
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-grafana-access']
+    networks:
+    - 'internal'
+  - domain: 'coder.0b.au'
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-coder-access']
+    networks:
+    - 'internal'
+  - domain: 'headlamp.0b.au'
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-headlamp-access']
+    networks:
+    - 'internal'
+  - domain: 'ollama.example.com'
+    policy: 'one_factor'
+    networks:
+    - 'internal'
+    subject:
+    - ['group:k8s-open-webui-users']
+    - ['group:k8s-open-webui-admins']
+  - domain: 'couchdb.example.com'
+    methods:
+      - OPTIONS
+    policy: 'bypass'
+  - domain: 'couchdb.example.com'
+    policy: 'one_factor'
+    networks:
+    - 'internal'
+    subject:
+    - ['group:k8s_coucchdb_access']
+  # Umami serves the dashboard and the public tracking endpoints on the same
+  # host. The tracker scripts and the collection endpoint must stay anonymous
+  # or analytics collection breaks, so they are bypassed ahead of the catch-all
+  # rule below. Umami has no OIDC support of its own, so this is an outer gate
+  # only — it still has its own local login behind Authelia.
+  - domain: 'umami.0b.au'
+    policy: 'bypass'
+    resources:
+    - '^/api/send(\?.*)?$'
+    - '^/script\.js(\?.*)?$'
+    - '^/recorder\.js(\?.*)?$'
+  - domain: 'umami.0b.au'
+    policy: 'one_factor'
+    networks:
+    - 'internal'

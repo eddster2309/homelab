@@ -1,0 +1,76 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: karakeep
+spec:
+  chart:
+    spec:
+      version: "0.33.1"
+  values:
+    controllers:
+      # The chart defaults to gcr.io/zenika-hub/alpine-chrome, whose gcr.io
+      # mirror now 403s on anonymous token requests. Same image and tag, pulled
+      # from the project's canonical Docker Hub repo instead.
+      chrome:
+        containers:
+          chrome:
+            image:
+              repository: zenika/alpine-chrome
+              tag: "124"
+      karakeep:
+        containers:
+          karakeep:
+            resources:
+              requests:
+                cpu: 50m
+                memory: 512Mi
+              limits:
+                cpu: 300m
+                memory: 2Gi
+            env:
+              DISABLE_PASSWORD_AUTH: "true"
+              OAUTH_ALLOW_DANGEROUS_EMAIL_ACCOUNT_LINKING: "true"
+              OAUTH_PROVIDER_NAME: OIDC
+              OAUTH_SCOPE: openid email profile
+              OAUTH_WELLKNOWN_URL: https://auth.0b.au/.well-known/openid-configuration
+              OAUTH_CLIENT_ID: karakeep
+              NEXTAUTH_URL: https://karakeep.0b.au
+              CRAWLER_FULL_PAGE_ARCHIVE: "true"
+              CRAWLER_FULL_PAGE_SCREENSHOT: "true"
+              CRAWLER_NUM_WORKERS: "2"
+              CRAWLER_SCREENSHOT_TIMEOUT_SEC: "15"
+              ASSET_STORE_S3_ENDPOINT: https://s3.0b.au
+              ASSET_STORE_S3_REGION: us-east-1
+              ASSET_STORE_S3_BUCKET: rke-karakeep-store
+              # versitygw serves both addressing styles; pin path style so this
+              # does not depend on the *.s3.0b.au wildcard.
+              ASSET_STORE_S3_FORCE_PATH_STYLE: "true"
+            envFrom:
+              - secretRef:
+                  name: oidc-secret
+              - secretRef:
+                  name: generic-secrets
+        statefulset:
+          volumeClaimTemplates:
+            - name: data
+              accessMode: ReadWriteOnce
+              size: 20Gi
+              globalMounts:
+                - path: /data
+    applicationHost: karakeep.0b.au
+    ingress:
+      karakeep:
+        className: traefik
+    meilisearch:
+      persistence:
+        enabled: true
+        accessMode: ReadWriteOnce
+        storageClass: longhorn
+      environment:
+        MEILI_ENV: production
+        MEILI_NO_ANALYTICS: true
+      envFrom:
+        - secretRef:
+            name: generic-secrets
+            items:
+              - key: MEILI_MASTER_KEY

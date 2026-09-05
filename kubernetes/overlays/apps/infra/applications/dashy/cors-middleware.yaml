@@ -1,0 +1,16 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: dashy-cors
+spec:
+  headers:
+    accessControlAllowOriginList:
+      - "https://dashy.0b.au"
+      - "https://auth.0b.au"
+    accessControlAllowMethods:
+      - GET
+      - POST
+      - OPTIONS
+    accessControlAllowHeaders:
+      - "*"
+    accessControlAllowCredentials: true

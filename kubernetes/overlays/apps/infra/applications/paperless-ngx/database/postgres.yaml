@@ -1,0 +1,15 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: paperless-ngx-db
+spec:
+  inheritedMetadata:
+    labels:
+      recurring-job-group.longhorn.io/default: disabled
+  instances: 2
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.6
+  storage:
+    size: 20Gi
+    storageClass: longhorn
+  monitoring:
+    enablePodMonitor: true

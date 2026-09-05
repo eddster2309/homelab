@@ -1,0 +1,8 @@
+{
+    "role_type": "jwt",
+    "policies": "{{ item.policies | join(',') }}",
+    "user_claim": "user_login",
+    "bound_claims": {{ item.claims | default({}) | to_json }},
+    "claim_mappings": {{ item.claim_mappings | default({}) | to_json }},
+    "bound_audiences": "{{ vault_url }}"
+}

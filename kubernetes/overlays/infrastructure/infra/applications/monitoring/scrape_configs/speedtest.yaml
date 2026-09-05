@@ -1,0 +1,13 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: speedtest-exporter
+spec:
+  selector:
+    matchLabels:
+      app: speedtest-exporter
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15m
+      scrapeTimeout: 2m

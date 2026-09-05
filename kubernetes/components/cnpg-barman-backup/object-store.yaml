@@ -1,0 +1,20 @@
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: garage-s3-store
+spec:
+  retentionPolicy: "14d"
+  configuration:
+    destinationPath: "s3://rke-cnpg-backups/"
+    # versitygw. The CR name is still garage-s3-store for continuity with
+    # the barmanObjectName the Clusters reference.
+    endpointURL: "https://s3.0b.au"
+    wal:
+      compression: gzip
+    s3Credentials:
+      accessKeyId:
+        name: cnpg-backup-s3
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: cnpg-backup-s3
+        key: ACCESS_SECRET_KEY

@@ -1,0 +1,19 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: keycloak-db
+spec:
+  inheritedMetadata:
+    labels:
+      recurring-job-group.longhorn.io/default: disabled
+  instances: 2
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.6
+  storage:
+    # Bumped from 10Gi: WAL archiving was broken for days, pg_wal filled the
+    # volume, and CNPG then refused to start PostgreSQL ("Not enough WAL disk
+    # space"). Archiving works again, so pg_wal drains -- this is headroom so a
+    # future archiving outage does not wedge the primary the same way.
+    size: 20Gi
+    storageClass: longhorn
+  monitoring:
+    enablePodMonitor: true

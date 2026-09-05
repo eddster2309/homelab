@@ -1,0 +1,9 @@
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Provider
+metadata:
+  name: notify-from-cert-manager
+  namespace: flux-system
+spec:
+  type: generic
+  address: http://notification-controller.flux-system.svc.cluster.local:9292/hook/4a4243e08d0249f803a3afcc1b4afc7712de406ec146eb7d016a0e05bc2404d4

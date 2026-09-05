@@ -1,0 +1,21 @@
+- name: Deploy garage
+  hosts: pve_ans_garage
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/garage.yaml
+  tasks:
+    - name: Stop garage
+      ansible.builtin.systemd:
+        name: garage
+        state: stopped
+
+    - name: Remove garage related files
+      ansible.builtin.file:
+        name: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/garage.conf
+        - /opt/garage
+        - /usr/local/bin/garage
+        - /etc/systemd/system/garage.service

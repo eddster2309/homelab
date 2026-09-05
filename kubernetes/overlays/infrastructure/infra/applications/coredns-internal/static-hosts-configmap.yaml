@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-static-hosts
+data:
+  hosts: |
+    # internal
+    REDACTED_IP    ipa-ldap.internal
+
+    # services.local
+    REDACTED_IP      nas.services.local
+
+    # internal
+    REDACTED_IP      nas.internal

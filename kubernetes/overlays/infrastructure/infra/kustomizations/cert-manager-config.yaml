@@ -1,0 +1,15 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cert-manager-config
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  path: ./kubernetes/overlays/infrastructure/infra/config/cert-manager
+  dependsOn: 
+    - name: cert-manager
+  prune: true
+  sourceRef:
+    kind: "GitRepository"
+    name: "flux-system"

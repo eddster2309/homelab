@@ -1,0 +1,48 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: cnpg-health
+spec:
+  groups:
+    - name: cnpg-health
+      rules:
+        - alert: CNPGInstanceDown
+          expr: cnpg_collector_up == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "CNPG instance {{ $labels.namespace }}/{{ $labels.pod }} is down"
+            description: "The PostgreSQL metrics exporter on {{ $labels.namespace }}/{{ $labels.pod }} has been unreachable for 2 minutes."
+        - alert: CNPGReplicationLagHigh
+          expr: cnpg_pg_replication_lag > 30
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CNPG replica {{ $labels.namespace }}/{{ $labels.pod }} is lagging"
+            description: "Replication lag on {{ $labels.namespace }}/{{ $labels.pod }} has been above 30s for 5 minutes."
+        - alert: CNPGManualSwitchoverRequired
+          expr: cnpg_collector_manual_switchover_required == 1
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "CNPG cluster {{ $labels.namespace }}/{{ $labels.pod }} needs a manual switchover"
+            description: "CloudNativePG could not perform an automatic failover for {{ $labels.namespace }}/{{ $labels.pod }} and requires manual intervention."
+        - alert: CNPGBackupFailed
+          expr: barman_cloud_cloudnative_pg_io_last_failed_backup_timestamp > barman_cloud_cloudnative_pg_io_last_available_backup_timestamp
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "CNPG backup failing for {{ $labels.namespace }}/{{ $labels.pod }}"
+            description: "The most recent backup attempt for {{ $labels.namespace }}/{{ $labels.pod }} failed and is more recent than the last successful backup."
+        - alert: CNPGBackupStale
+          expr: time() - barman_cloud_cloudnative_pg_io_last_available_backup_timestamp > 93600
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CNPG backup is stale for {{ $labels.namespace }}/{{ $labels.pod }}"
+            description: "No successful backup for {{ $labels.namespace }}/{{ $labels.pod }} in over 26 hours (nightly schedule is 02:00)."

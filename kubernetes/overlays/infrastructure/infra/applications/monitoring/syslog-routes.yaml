@@ -1,0 +1,26 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: syslog-tcp
+spec:
+  entryPoints:
+    - syslog-tcp
+  routes:
+    - match: HostSNI(`*`)
+      services:
+        - name: rsyslog
+          port: 514
+          namespace: monitoring
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteUDP
+metadata:
+  name: syslog-udp
+spec:
+  entryPoints:
+    - syslog-udp
+  routes:
+    - services:
+        - name: rsyslog
+          port: 514
+          namespace: monitoring
