@@ -1,0 +1,65 @@
+---
+# tasks file for configure_vault
+- name: Configure IP Tables
+  ansible.builtin.include_tasks: iptables.yaml
+
+- name: Pre Config
+  ansible.builtin.include_tasks: pre_config.yaml
+
+- name: Generate ceritifcate
+  ansible.builtin.include_tasks: certificate.yaml
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers
+
+- name: Check if vault is initialized
+  ansible.builtin.command: "vault status -format=json"
+  register: vault_status
+  failed_when: vault_status.rc == 1
+  changed_when: false
+  environment:
+    VAULT_ADDR: "{{ vault_internal_url }}"
+
+- name: Initial Vault config
+  when: not vault_status.stdout | from_json | json_query('initialized') | bool
+  ansible.builtin.include_tasks: init.yaml
+
+- name: Check if vault is sealed
+  when: vault_status.stdout | from_json | json_query('sealed') | bool
+  ansible.builtin.pause:
+    prompt: "Vault is sealed, please unseal it with the unseal keys. Press enter when done."
+
+- name: Login to Vault
+  ansible.builtin.include_tasks: vault_login.yaml
+  when: vault_status.stdout | from_json | json_query('initialized') | bool
+
+- name: Configure vault
+  environment:
+    VAULT_ADDR: "{{ vault_internal_url }}"
+    VAULT_TOKEN: "{{ vault_auth_token }}"
+  block:
+    - name: Enable audit logging
+      ansible.builtin.command: "vault audit enable file file_path=/var/log/vault_audit.log"
+      register: out
+      changed_when: out.rc == 0
+      failed_when: out.rc != 0 and out.rc != 2
+
+    - name: Create Policy
+      ansible.builtin.include_tasks: policy.yaml
+
+    - name: Create Secret Engine
+      ansible.builtin.include_tasks: secret_engine.yaml
+
+    - name: Create Admin Account
+      ansible.builtin.include_tasks: admin_account.yaml
+
+    - name: Configure Authenication
+      ansible.builtin.include_tasks: auth.yaml
+
+- name: Revoke initial root token
+  environment:
+    VAULT_ADDR: "{{ vault_internal_url }}"
+    VAULT_TOKEN: "{{ vault_auth_token }}"
+  ansible.builtin.command: "vault token revoke {{ vault_init.stdout | from_json | json_query('root_token') }}"
+  when: not vault_status.stdout | from_json | json_query('initialized') | bool
+  changed_when: false

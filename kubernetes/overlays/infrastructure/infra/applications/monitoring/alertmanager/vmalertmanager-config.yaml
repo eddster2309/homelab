@@ -1,0 +1,17 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAlertmanagerConfig
+metadata:
+  name: default
+spec:
+  route:
+    receiver: all-channels
+    group_by: ['alertname', 'namespace']
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 12h
+  receivers:
+    - name: all-channels
+      discord_configs:
+        - webhook_url_secret:
+            name: alertmanager-discord
+            key: webhook_url

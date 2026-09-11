@@ -1,0 +1,10 @@
+resources:
+  - allow-dns.yaml
+  - allow-traefik.yaml
+  - allow-internal-ingress.yaml
+  - allow-ldaps.yaml
+  - allow-smtp.yaml
+  - default-deny-egress.yaml
+  - allow-cnpg-egress.yaml
+  - allow-cnpg-s3-egress.yaml
+  - allow-vmagent.yaml

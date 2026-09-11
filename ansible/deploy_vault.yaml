@@ -1,0 +1,23 @@
+- name: Deploy infrastructure
+  hosts: localhost
+  vars_files:
+    - vars/vault.yaml
+  tasks:
+    - name: Deploy vault nodes on proxmox
+      ansible.builtin.include_role:
+        name: node_create
+
+- name: Deploy Vault
+  hosts: pve_ans_vault
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/vault.yaml
+  roles:
+    # - role: robertdebock.bootstrap
+    # - role: robertdebock.core_dependencies
+    # - role: robertdebock.hashicorp
+    # - role: robertdebock.vault
+    #   vault_hardening_disable_swap: false
+    - role: configure_vault
+      tags: configure_vault

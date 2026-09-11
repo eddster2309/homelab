@@ -1,0 +1,25 @@
+# The CRDs ship as their own chart upstream (the operator chart carries them as
+# a subchart gated behind crds.enabled, which defaults to false). Keeping them
+# in a separate release means an operator upgrade or rollback never takes the
+# CRDs -- and with them every MariaDB object in the cluster -- along with it.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: mariadb-operator-crds
+spec:
+  interval: 30m
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      retries: -1
+  chart:
+    spec:
+      chart: mariadb-operator-crds
+      version: "*"
+      sourceRef:
+        kind: HelmRepository
+        name: mariadb-operator
+        namespace: flux-system
+      interval: 12h

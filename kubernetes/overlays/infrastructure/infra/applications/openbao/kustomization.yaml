@@ -1,0 +1,9 @@
+namespace: openbao
+resources:
+  - ../../../../../bases/openbao
+  - oidc-secret.yaml
+patches:
+  - target:
+      kind: HelmRelease
+      name: openbao
+    path: openbao-patch.yaml

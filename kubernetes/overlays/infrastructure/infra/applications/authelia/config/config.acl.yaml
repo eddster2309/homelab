@@ -1,0 +1,102 @@
+access_control:
+  default_policy: 'deny'
+  networks:
+  - name: 'internal'
+    networks:
+    - 'REDACTED_IP/8'
+    - 'REDACTED_IP/12'
+    - 'REDACTED_IP/16'
+  - name: 'core'
+    networks:
+    - 'REDACTED_IP/24'
+  rules:
+  - domain: 'traefik.0b.au'
+    policy: 'one_factor'
+    networks:
+    - 'internal'
+    subject:
+    - ['group:k8s-infra-traefik-access']
+  - domain: 'longhorn.0b.au'
+    policy: 'one_factor'
+    networks:
+    - 'internal'
+    subject:
+    - ['group:k8s-infra-longhorn-access']
+  - domain: 'cilium.0b.au'
+    policy: 'one_factor'
+    networks:
+    - 'internal'
+    subject:
+    - ['group:k8s-infra-cilium-access']
+  - domain: 'whoami.0b.au'
+    policy: 'one_factor'
+    networks:
+    - 'internal'
+  - domain: 'cctv.0b.au'
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-cctv-access']
+    networks:
+    - 'internal'
+  - domain: 'vm-agent.0b.au'
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-monitor-vm-agent-access']
+    networks:
+    - 'internal'
+  - domain: 'grafana.0b.au'
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-grafana-access']
+    networks:
+    - 'internal'
+  - domain: 'coder.0b.au'
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-coder-access']
+    networks:
+    - 'internal'
+  - domain: 'headlamp.0b.au'
+    policy: 'one_factor'
+    subject:
+    - ['group:k8s-headlamp-access']
+    networks:
+    - 'internal'
+  - domain: 'ollama.example.com'
+    policy: 'one_factor'
+    networks:
+    - 'internal'
+    subject:
+    - ['group:k8s-open-webui-users']
+    - ['group:k8s-open-webui-admins']
+  - domain: 'couchdb.example.com'
+    methods:
+      - OPTIONS
+    policy: 'bypass'
+  - domain: 'couchdb.example.com'
+    policy: 'one_factor'
+    networks:
+    - 'internal'
+    subject:
+    - ['group:k8s_coucchdb_access']
+  # Matomo serves the dashboard and the public tracking endpoints on the same
+  # host. The tracker script and the collection endpoints must stay anonymous
+  # or analytics collection breaks, so they are bypassed ahead of the catch-all
+  # rule below. matomo.php/matomo.js are the current names, piwik.* the legacy
+  # aliases still emitted by older tracking snippets, and /js/* is what Tag
+  # Manager containers request. Matomo has no OIDC support without a plugin, so
+  # this is an outer gate only -- it still has its own local login behind
+  # Authelia.
+  - domain: 'matomo.0b.au'
+    policy: 'bypass'
+    resources:
+    - '^/matomo\.php(\?.*)?$'
+    - '^/matomo\.js(\?.*)?$'
+    - '^/piwik\.php(\?.*)?$'
+    - '^/piwik\.js(\?.*)?$'
+    - '^/js/tracker\.php(\?.*)?$'
+    - '^/js/container_[^/]+\.js(\?.*)?$'
+  - domain: 'matomo.0b.au'
+    policy: 'one_factor'
+    networks:
+    - 'internal'

@@ -1,0 +1,106 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: keycloak
+spec:
+  timeout: 10m
+  chart:
+    spec:
+      chart: keycloakx
+      version: "7.3.1"
+      sourceRef:
+        kind: HelmRepository
+        name: codecentric
+        namespace: flux-system
+  values:
+    replicas: 2
+
+    # No realms are provisioned here — realms, clients and the FreeIPA LDAP
+    # user federation are managed out-of-band with Terraform.
+
+    # The image ENTRYPOINT is kc.sh with no CMD, so the subcommand must be
+    # supplied explicitly or the container just prints help and exits.
+    args:
+      - "start"
+
+    http:
+      relativePath: "/"
+
+    # Traefik terminates TLS and sends X-Forwarded-* headers.
+    proxy:
+      enabled: true
+      mode: xforwarded
+      http:
+        enabled: true
+
+    database:
+      vendor: postgres
+      hostname: keycloak-db-rw.keycloak.svc.cluster.local
+      port: 5432
+      database: app
+      username: app
+      existingSecret: keycloak-db-app
+      existingSecretKey: password
+
+    dbchecker:
+      enabled: true
+
+    # Multi-replica Infinispan discovery via the shared Postgres, so no
+    # extra service discovery is needed.
+    cache:
+      stack: default
+
+    extraEnv: |
+      - name: KC_HOSTNAME
+        value: https://keycloak.0b.au
+      - name: KC_HOSTNAME_ADMIN
+        value: https://keycloak.0b.au
+      # Trust the FreeIPA CA so the LDAPS connection to ipa01 validates.
+      - name: KC_TRUSTSTORE_PATHS
+        value: /opt/keycloak/truststore/ca-certificates.crt
+      - name: KC_BOOTSTRAP_ADMIN_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: keycloak-bootstrap-admin
+            key: username
+      - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: keycloak-bootstrap-admin
+            key: password
+
+    extraVolumes: |
+      - name: ipa-ca
+        configMap:
+          name: ipa-ca
+
+    extraVolumeMounts: |
+      - name: ipa-ca
+        mountPath: /opt/keycloak/truststore
+        readOnly: true
+
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "1024Mi"
+      limits:
+        cpu: "1"
+        memory: "2048Mi"
+
+    podAnnotations:
+      reloader.stakater.com/auto: "true"
+
+    ingress:
+      enabled: true
+      ingressClassName: traefik
+      rules:
+        - host: keycloak.0b.au
+          paths:
+            - path: /
+              pathType: Prefix
+
+    serviceMonitor:
+      enabled: true
+
+    podDisruptionBudget:
+      maxUnavailable: 1

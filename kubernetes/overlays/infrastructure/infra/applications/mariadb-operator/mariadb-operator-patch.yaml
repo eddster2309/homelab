@@ -1,0 +1,38 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: mariadb-operator
+spec:
+  chart:
+    spec:
+      chart: mariadb-operator
+      version: "26.6.0"
+      sourceRef:
+        kind: HelmRepository
+        name: mariadb-operator
+        namespace: flux-system
+  values:
+    # CRDs are managed by the mariadb-operator-crds HelmRelease instead.
+    crds:
+      enabled: false
+    # The cert-controller issues and rotates the webhook's serving certificate,
+    # so cert-manager is not in the path for the operator's own webhooks.
+    certController:
+      enabled: true
+    # Chart only emits prometheus-operator ServiceMonitors, and only when
+    # metrics are on. Left off for now; the cluster scrapes via VMServiceScrape.
+    metrics:
+      enabled: false
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+    webhook:
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+        limits:
+          memory: 256Mi

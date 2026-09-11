@@ -1,0 +1,34 @@
+- name: Install Alloy
+  hosts: all
+  become: true
+  tasks:
+    - name: Check if Docker is installed
+      ansible.builtin.command: docker --version
+      register: docker_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Install Alloy
+      ansible.builtin.include_role:
+        name: grafana.grafana.alloy
+      vars:
+        alloy_config: "{{ lookup('template', 'alloy/conf.yaml.j2') }}"
+
+    - name: Add alloy to docker group
+      ansible.builtin.user:
+        name: alloy
+        groups: docker
+        append: true
+      when: docker_check is not failed
+
+    - name: Allow  Alloy access to the logs
+      community.general.capabilities:
+        path: /usr/bin/alloy
+        capability: cap_sys_admin,cap_dac_read_search=+ep
+        state: present
+
+    - name: Restart Alloy service
+      ansible.builtin.systemd:
+        name: alloy
+        state: restarted
+        enabled: true

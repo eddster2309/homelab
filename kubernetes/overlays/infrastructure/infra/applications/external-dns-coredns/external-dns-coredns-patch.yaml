@@ -1,0 +1,25 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: external-dns-coredns
+spec:
+  values:
+    policy: sync
+    logLevel: debug
+    logFormat: json
+    domainFilters:
+      - example.com
+      - 0b.au
+    sources:
+      - service
+      - ingress
+      - traefik-proxy
+    provider:
+      name: coredns
+    env:
+      - name: ETCD_URLS
+        value: http://etcd.coredns-internal.svc.cluster.local:2379
+    extraArgs:
+      - --coredns-prefix=/skydns
+    podAnnotations:
+      reloader.stakater.com/auto: "true"

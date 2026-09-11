@@ -1,0 +1,16 @@
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Alert
+metadata:
+  name: cert-manager-ready
+  namespace: flux-system
+spec:
+  providerRef:
+    name: notify-from-cert-manager
+  eventSeverity: info
+  eventSources:
+    - apiVersion: kustomize.toolkit.fluxcd.io/v1
+      kind: Kustomization
+      name: cert-manager
+  inclusionList:
+    - "ReconciliationSucceeded"

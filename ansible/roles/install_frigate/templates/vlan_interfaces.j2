@@ -1,0 +1,4 @@
+# {{ ansible_managed }}
+
+auto {{ ansible_default_ipv4.interface }}.{{ install_frigate_cctv_vlan_id }}
+iface {{ ansible_default_ipv4.interface }}.{{ install_frigate_cctv_vlan_id }} inet dhcp

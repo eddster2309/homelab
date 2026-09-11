@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: coredns-internal
+resources:
+  - ../../../../../bases/coredns-internal
+  - ./etcd.yaml
+  - ./static-hosts-configmap.yaml
+patches:
+  - target:
+      kind: HelmRelease
+      name: coredns
+    path: coredns-patch.yaml

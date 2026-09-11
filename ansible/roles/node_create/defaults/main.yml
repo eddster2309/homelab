@@ -1,0 +1,23 @@
+---
+# defaults file for node_create
+dns_server: "REDACTED_IP"
+search_domain: "example.com"
+proxmox_host: "REDACTED_IP:8006/api2/json"
+proxmox_user: "root@pam!ansible"
+proxmox_password: "password123"
+proxmox_datastore_id: "local-zfs"
+vm_user: "cloud-user"
+vm_user_ssh_key: "PUBLIC_KEY"
+vm_template_id: "100"
+proxmox_node_name: "pve1"
+vm_count: "2"
+vm_cpu_core_count: "2"
+vm_memory: "4096"
+vm_disk_size: "30G"
+service_name: "service1"
+vm_net_bridge: "vmbr0"
+vm_start_ip: "REDACTED_IP"
+vm_ip_subnet: "24"
+vm_ip_gateway: "REDACTED_IP"
+vm_ipa_joined: true
+vm_tags: []

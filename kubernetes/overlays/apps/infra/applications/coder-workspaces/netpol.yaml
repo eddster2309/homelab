@@ -1,0 +1,76 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: coder-workspaces
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-coder-ingress
+  namespace: coder-workspaces
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          app: coder
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-controller
+  namespace: coder-workspaces
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          role: ingress-controller
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: workspace-egress
+  namespace: coder-workspaces
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+  - ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          app: coder
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          role: ingress-controller
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: default
+    ports:
+    - port: 443
+      protocol: TCP
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          role: ingress-controller
+  - to:
+    - ipBlock:
+        cidr: REDACTED_IP/0
+        except:
+          - REDACTED_IP/16
+          - REDACTED_IP/16

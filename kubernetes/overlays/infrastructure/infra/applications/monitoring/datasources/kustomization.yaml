@@ -1,0 +1,5 @@
+namespace: monitoring
+resources:
+- loki.yaml
+- asher-loki.yaml
+- asher-metrics.yaml

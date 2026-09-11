@@ -1,0 +1,27 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: couchdb
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: couchdb.example.com
+    external-dns.alpha.kubernetes.io/target: "REDACTED_IP"
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`couchdb.example.com`) && Method(`OPTIONS`)
+      kind: Rule
+      services:
+        - name: couchdb-svc-couchdb
+          port: 5984
+      middlewares:
+        - name: couchdb-cors
+    - match: Host(`couchdb.example.com`)
+      kind: Rule
+      services:
+        - name: couchdb-svc-couchdb
+          port: 5984
+      middlewares:
+        - name: couchdb-cors
+        - name: authelia
+          namespace: traefik

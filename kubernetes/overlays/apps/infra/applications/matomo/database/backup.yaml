@@ -1,0 +1,30 @@
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: Backup
+metadata:
+  name: matomo-db-nightly-backup
+spec:
+  mariaDbRef:
+    name: matomo-db
+  # 2 AM daily, matching the CNPG ScheduledBackup the other apps use.
+  schedule:
+    cron: "0 2 * * *"
+  timeZone: "Australia/Sydney"
+  compression: gzip
+  # 14 days, matching the barman ObjectStore retention policy.
+  maxRetention: 336h
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  storage:
+    s3:
+      bucket: rke-cnpg-backups
+      prefix: matomo-db
+      # Endpoint is given without a scheme; tls.enabled selects https.
+      endpoint: s3.0b.au
+      tls:
+        enabled: true
+      accessKeyIdSecretKeyRef:
+        name: matomo-backup-s3
+        key: ACCESS_KEY_ID
+      secretAccessKeySecretKeyRef:
+        name: matomo-backup-s3
+        key: ACCESS_SECRET_KEY

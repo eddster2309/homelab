@@ -1,0 +1,68 @@
+# Single front door for all external metric and log ingest.
+#
+# This host was previously served directly by the vminsert and loki-gateway
+# ingresses, with no authentication on either. vmauth now owns it and serves two
+# lanes:
+#
+#   anonymous     -- unchanged, pre-existing behaviour for the homelab tenant
+#   authenticated -- one VMUser per remote tenant, each pinned to its own tenant id
+#
+# Anonymous writes to the homelab tenant are deliberately preserved: a lot of the
+# existing fleet depends on them. That does mean a stranger who can reach this
+# host can still write junk as "homelab" -- a pre-existing exposure this does not
+# introduce and does not fix. What it does prevent is a tenant reaching another
+# tenant's data in either direction.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAuth
+metadata:
+  name: ingest
+spec:
+  # Fronts every external write, so don't make it a single point of failure.
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+  # Tenants are onboarded purely by creating a VMUser with this label in the
+  # monitoring namespace. Nothing is picked up implicitly.
+  userSelector:
+    matchLabels:
+      ingest-tenant: "true"
+
+  ingress:
+    class_name: traefik
+    host: monitoring.example.com
+    # No Authelia middleware: forward-auth is interactive and cannot secure
+    # machine writes. TLS comes from the traefik TLSStore wildcard, as everywhere
+    # else in this cluster, so no tls block is needed here.
+
+  # The anonymous lane. Requests arriving with no credentials -- or with bad
+  # ones, see the note in vmuser-asher.yaml -- are matched here.
+  unauthorizedUserAccessSpec:
+    url_map:
+      # Metrics -> homelab (accountID 0). Deliberately the whole /insert/0/ tree
+      # rather than just prometheus remote write, because the ingress this
+      # replaces routed all of /insert and existing writers may use the influx,
+      # opentsdb or datadog endpoints under it. /insert/1/ matches nothing in
+      # this lane, so an unauthenticated attempt at the tenant is rejected.
+      - src_paths:
+          - "/insert/0/.+"
+        url_prefix:
+          - "http://vminsert-vicmetrics-victoria-metrics-k8s-stack.monitoring.svc.cluster.local:8480"
+
+      # Logs -> homelab. Covers query paths as well as push, again to preserve
+      # what the loki-gateway ingress served on this host. The tenant header is
+      # forced rather than passed through, so a client cannot select a tenant by
+      # setting it themselves.
+      - src_paths:
+          - "/loki/.+"
+        url_prefix:
+          - "http://loki-gateway.monitoring.svc.cluster.local:80"
+        headers:
+          - "X-Scope-OrgID: homelab"
+
+    # No default_url on purpose: an unmatched path should fail rather than be
+    # silently routed somewhere.
