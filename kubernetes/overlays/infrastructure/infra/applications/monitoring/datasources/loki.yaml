@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource-configmap-loki
+  labels:
+     grafana_datasource: "1"
+  # annotations:
+  #     k8s-sidecar-target-directory = "/tmp/dashboards/[FODLER]"
+data:
+  loki.yaml: |-
+    apiVersion: 1
+    datasources:
+        # <string, required> Name of the VictoriaLogs datasource
+        # displayed in Grafana panels and queries.
+      - name: Loki
+        # <string, required> Sets the data source type.
+        type: loki
+        access: proxy
+        url: http://loki-gateway.monitoring.svc.cluster.local:80
+        isDefault: false
+        # Loki is multi-tenant now. The gateway would default an absent header to
+        # homelab anyway, but set it explicitly so this datasource keeps working
+        # if that default is ever removed. Tenant ids are not secrets --
+        # secureJsonData is just where Grafana expects header values to live.
+        jsonData:
+          httpHeaderName1: 'X-Scope-OrgID'
+        secureJsonData:
+          httpHeaderValue1: 'homelab'

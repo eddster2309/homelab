@@ -1,0 +1,45 @@
+# Matomo only supports MySQL/MariaDB -- it has no Postgres driver -- so this is
+# the one database in the cluster that is not CNPG. mariadb-operator plays the
+# same role here that CNPG does elsewhere: no bundled Helm database.
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: MariaDB
+metadata:
+  name: matomo-db
+spec:
+  image: mariadb:11.8.9
+  # Single instance. Galera/replication would need at least 3 nodes and buys
+  # little here -- Longhorn already replicates the volume.
+  replicas: 1
+  rootPasswordSecretKeyRef:
+    name: matomo-db-credentials
+    key: root-password
+  # Creates the initial database and a user with ALL PRIVILEGES on it.
+  database: matomo
+  username: matomo
+  passwordSecretKeyRef:
+    name: matomo-db-credentials
+    key: password
+  inheritMetadata:
+    labels:
+      recurring-job-group.longhorn.io/default: disabled
+  storage:
+    size: 10Gi
+    storageClassName: longhorn
+    resizeInUseVolumes: true
+  myCnf: |
+    [mariadb]
+    bind-address=*
+    default_storage_engine=InnoDB
+    innodb_file_per_table=1
+    innodb_buffer_pool_size=256M
+    character_set_server=utf8mb4
+    collation_server=utf8mb4_general_ci
+    # Matomo's archiving queries and log imports send large statements.
+    max_allowed_packet=64M
+    max_connections=200
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi

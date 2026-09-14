@@ -1,0 +1,15 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: coder-db
+  namespace: coder
+spec:
+  inheritedMetadata:
+    labels:
+      recurring-job-group.longhorn.io/default: disabled
+  instances: 2
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.3
+  storage:
+    size: 20Gi
+  monitoring:
+    enablePodMonitor: true

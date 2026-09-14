@@ -1,0 +1,5 @@
+namespace: external-secrets
+resources:
+  - cluster-secret-store.yaml
+components:
+- ../../../../../components/ca-certs

@@ -1,0 +1,25 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: whoami
+spec:
+  chart:
+    spec:
+      version: "6.0.0"
+  values:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 16Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi
+    ingress:
+      enabled: true
+      ingressClassName: "traefik"
+      annotations:
+        traefik.ingress.kubernetes.io/router.middlewares: traefik-authelia@kubernetescrd
+      hosts:
+        - host: whoami.0b.au
+          paths:
+            - /

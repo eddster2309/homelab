@@ -1,0 +1,59 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: coredns
+spec:
+  values:
+    replicaCount: 2
+    
+    serviceType: LoadBalancer
+    service:
+      annotations:
+        lbipam.cilium.io/ips: "REDACTED_IP"
+
+    servers:
+      - zones:
+          - zone: .
+        port: 53
+        plugins:
+          - name: errors
+          - name: health
+            configBlock: |
+              lameduck 5s
+          - name: ready
+          - name: etcd
+            parameters: example.com example.net 0b.au
+            configBlock: |
+              stubzones
+              path /skydns
+              endpoint http://etcd.coredns-internal.svc.cluster.local:2379
+              fallthrough
+          - name: hosts
+            parameters: /etc/coredns/custom/hosts
+            configBlock: |
+              ttl 60
+              reload 15s
+              fallthrough
+          - name: forward
+            parameters: . REDACTED_IP REDACTED_IP
+          - name: cache
+            parameters: "30"
+          - name: log
+          - name: loop
+          - name: reload
+          - name: loadbalance
+          - name: prometheus
+            parameters: REDACTED_IP:9153
+
+    extraVolumes:
+      - name: custom-hosts
+        configMap:
+          name: coredns-static-hosts
+    extraVolumeMounts:
+      - name: custom-hosts
+        mountPath: /etc/coredns/custom
+
+    podDnsPolicy: "ClusterFirst"
+
+    podAnnotations:
+      reloader.stakater.com/auto: "true"

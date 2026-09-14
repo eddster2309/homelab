@@ -1,0 +1,46 @@
+# - name: Deploy infrastructure
+#   hosts: localhost
+#   vars_files:
+#     - vars/zot.yaml
+#   tasks:
+#     - name: Deploy zot node on proxmox
+#       ansible.builtin.include_role:
+#         name: node_create
+
+- name: Deploy Zot
+  hosts: pve_ans_registry
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/zot.yaml
+  tasks:
+    - name: Install required packages
+      ansible.builtin.package:
+        name:
+          - certbot
+          - python3-certbot-dns-cloudflare 
+        state: present
+    
+    - name: Place Cloudflare credentials
+      ansible.builtin.template:
+        src: cloud-proxy/cloudflare.ini.j2
+        dest: /etc/letsencrypt/cloudflare.ini
+        mode: '0600'
+        owner: root
+        group: root
+    
+    - name: Generate certbot SSL certificate
+      ansible.builtin.command:
+        cmd: "certbot certonly --dns-cloudflare --dns-cloudflare-credentials /etc/letsencrypt/cloudflare.ini --non-interactive --agree-tos {% for domain in zot_cert_domains %}-d {{ domain }} {% endfor %} --post-hook 'systemctl restart zot' --email {{ nginx_reverse_proxy_cloudflare_email }} --cert-name {{ service_name }}"
+    
+    - name: Give zot permission to access SSL certs
+      ansible.builtin.file:
+        path: "/etc/letsencrypt/archive/{{ service_name }}"
+        owner: zot
+        group: zot
+        mode: '0755'
+        recurse: yes
+
+    - name: Deploy Zot registry
+      ansible.builtin.include_role:
+        name: zot

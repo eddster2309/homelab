@@ -1,0 +1,94 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: versitygw
+spec:
+  values:
+    # The posix backend writes straight onto the NFS share, so only ever run a
+    # single writer against it.
+    replicaCount: 1
+    strategy:
+      type: Recreate
+
+    auth:
+      existingSecret: versitygw-root-credentials
+
+    gateway:
+      backend:
+        type: posix
+        args: "/mnt/data"
+      port: 7070
+      region: us-east-1
+      # Required for the WebUI to call the S3/admin endpoints from the browser.
+      corsAllowOrigin: "https://versity.0b.au"
+      # Virtual-host style addressing: <bucket>.s3.0b.au. Path-style
+      # requests keep working alongside it. Every subdomain under this domain is
+      # now reserved for buckets -- don't hang anything else off it.
+      virtualDomain: "s3.0b.au"
+
+    admin:
+      enabled: true
+      port: 7071
+      ingress:
+        enabled: true
+        className: traefik
+        hosts:
+          - host: s3-admin.0b.au
+            paths:
+              - path: /
+                pathType: Prefix
+
+    webui:
+      enabled: true
+      port: 8080
+      # Auto-detection returns pod IPs, so the external endpoints are pinned
+      # here. These must be full URLs -- versitygw rejects bare hostnames.
+      apiGateways:
+        - https://s3.0b.au
+      adminGateways:
+        - https://s3-admin.0b.au
+      ingress:
+        enabled: true
+        className: traefik
+        hosts:
+          - host: versity.0b.au
+            paths:
+              - path: /
+                pathType: Prefix
+
+    # Internal flat-file IAM so users/keys can be created beyond the root account.
+    iam:
+      enabled: true
+      type: internal
+
+    ingress:
+      enabled: true
+      className: traefik
+      hosts:
+        - host: s3.0b.au
+          paths:
+            - path: /
+              pathType: Prefix
+              servicePort: s3-api
+        # Virtual-host style bucket addressing
+        - host: "*.s3.0b.au"
+          paths:
+            - path: /
+              pathType: Prefix
+              servicePort: s3-api
+
+    # Static NFS share, bound via the PV/PVC pair in nfs-storage.yaml.
+    persistence:
+      enabled: true
+      create: false
+      claimName: versitygw-nfs-data
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 1Gi
+
+    podAnnotations:
+      reloader.stakater.com/auto: "true"

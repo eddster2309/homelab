@@ -1,0 +1,6 @@
+---
+# handlers file for configure_devbox
+- name: Restart firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    state: restarted

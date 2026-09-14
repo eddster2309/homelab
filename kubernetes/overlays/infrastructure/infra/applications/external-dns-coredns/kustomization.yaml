@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: external-dns-coredns
+resources:
+  - ../../../../../bases/external-dns
+patches:
+  - target:
+      kind: HelmRelease
+    path: ./external-dns-coredns-patch.yaml
+  - target:
+      kind: HelmRelease
+    patch: |
+      - op: replace
+        path: /metadata/name
+        value: external-dns-coredns
+  - target:
+      kind: Namespace
+    patch: |
+      - op: replace
+        path: /metadata/name
+        value: external-dns-coredns
+      - op: add
+        path: /metadata/labels
+        value:
+          app: external-dns-coredns

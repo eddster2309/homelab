@@ -1,0 +1,35 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: couchdb
+spec:
+  values:
+    createAdminSecret: false
+
+    replicaCount: 1
+
+    persistentVolume:
+      enabled: true
+      size: 10Gi
+      storageClass: longhorn
+
+    podAnnotations:
+      reloader.stakater.com/auto: "true"
+
+    ingress:
+      enabled: false
+
+    couchdbConfig:
+      couchdb:
+        uuid: 67d96d12-81f1-43a3-9de8-f26928bdb675
+      chttpd:
+        # proxy_authentication_handler must be first so Authelia's Remote-User header is trusted before cookie/default auth
+        authentication_handlers: >-
+          {chttpd_auth, proxy_authentication_handler},
+          {chttpd_auth, cookie_authentication_handler},
+          {chttpd_auth, default_authentication_handler}
+        bind_address: "REDACTED_IP"
+      couch_httpd_auth:
+        proxy_use_secret: "false"
+        x_auth_username: Remote-User
+        x_auth_roles: Remote-Groups

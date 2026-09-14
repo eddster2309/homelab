@@ -1,0 +1,78 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: matomo
+spec:
+  interval: 30m
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      retries: -1
+  chart:
+    spec:
+      chart: app-template
+      version: "*"
+      sourceRef:
+        kind: HelmRepository
+        name: bjw-s
+        namespace: flux-system
+      interval: 12h
+  values:
+    controllers:
+      matomo:
+        # Single writer: the app PVC is longhorn/RWO and Matomo keeps its
+        # config, plugins and tmp cache on it.
+        replicas: 1
+        strategy: Recreate
+        containers:
+          app:
+            image:
+              repository: matomo
+              tag: 5.13.0-apache
+            probes:
+              # First boot unpacks the whole Matomo tree from /usr/src/matomo
+              # onto the empty PVC and chowns it before Apache is exec'd, so
+              # nothing listens on :80 for a few minutes. The startup probe
+              # absorbs that and keeps liveness from killing the pod mid-copy.
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: 80
+                  initialDelaySeconds: 15
+                  periodSeconds: 10
+                  timeoutSeconds: 5
+                  failureThreshold: 60
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: 80
+                  periodSeconds: 30
+                  timeoutSeconds: 5
+                  failureThreshold: 3
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: 80
+                  periodSeconds: 15
+                  timeoutSeconds: 5
+                  failureThreshold: 3
+            resources:
+              requests:
+                cpu: 50m
+                memory: 256Mi
+              limits:
+                memory: 1Gi
+    service:
+      app:
+        controller: matomo
+        ports:
+          http:
+            port: 80

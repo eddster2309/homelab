@@ -1,0 +1,4 @@
+resources:
+  - dragonfly.yaml
+  - postgres.yaml
+  # - pg-backup.yaml

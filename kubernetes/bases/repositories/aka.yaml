@@ -1,0 +1,11 @@
+# Django
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: aka
+  namespace: flux-system
+spec:
+  interval: 10m
+  url: oci://ghcr.io/snakdy/aka/helm-charts/aka
+  ref:
+    semver: ">=0.2.0"

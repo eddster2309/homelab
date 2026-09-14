@@ -1,0 +1,3 @@
+resources: 
+- hubble-consolelink.yaml
+- longhorn-consolelink.yaml

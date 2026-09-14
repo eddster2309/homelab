@@ -1,0 +1,22 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: keycloak
+  namespace: keycloak
+spec:
+  interval: 30m
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      retries: -1
+  chart:
+    spec:
+      chart: keycloakx
+      version: "*"
+      sourceRef:
+        kind: HelmRepository
+        name: codecentric
+        namespace: flux-system
+      interval: 12h

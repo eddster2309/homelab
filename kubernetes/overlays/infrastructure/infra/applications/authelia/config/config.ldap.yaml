@@ -1,0 +1,22 @@
+authentication_backend:
+ ldap:
+    address: 'ldaps://ipa01.internal'
+    implementation: 'custom'
+    timeout: '5s'
+    start_tls: false
+    tls:
+      server_name: 'ipa01.internal'
+      skip_verify: false
+    base_dn: 'DC=example,DC=com'
+    additional_users_dn: 'CN=users,CN=accounts'
+    users_filter: '(&(|({username_attribute}={input})({mail_attribute}={input}))(objectClass=person))'
+    additional_groups_dn: 'cn=groups,cn=accounts'
+    groups_filter: '(&(|{memberof:rdn})(objectClass=groupOfNames))'
+    group_search_mode: 'memberof'
+    user: 'UID=svc_authelia_bind,CN=users,CN=accounts,DC=example,DC=com'
+    attributes:
+      distinguished_name: 'distinguishedName'
+      username: 'uid'
+      mail: 'mail'
+      member_of: 'memberOf'
+      group_name: 'cn'

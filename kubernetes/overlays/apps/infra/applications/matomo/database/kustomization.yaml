@@ -1,0 +1,5 @@
+resources:
+  - db-secret.yaml
+  - mariadb.yaml
+  - s3-secret.yaml
+  - backup.yaml

@@ -1,0 +1,15 @@
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: dragonfly-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dragonfly-operator
+  endpoints:
+  - port: https
+    path: /metrics
+    scheme: https
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    tlsConfig:
+      insecureSkipVerify: true

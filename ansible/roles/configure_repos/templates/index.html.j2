@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repository Mirrors</title>
+</head>
+<body>
+    <h1>Example Network Repository Mirrors</h1>
+    <p>This is a list of repository mirrors that are available for use.</p>
+    <p>These mirrors are proxy of the official repositories and are used to speed up the download of packages.</p>
+    <ul>
+{% for mirror in configure_repos_mirrors %}
+        <li><a href="http://{{ mirror.name }}.{{ mirror_subdomain }}">{{ mirror.name }}</a></li>
+{% endfor %}
+    </ul>
+</body>
+</html>

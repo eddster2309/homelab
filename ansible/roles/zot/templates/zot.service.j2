@@ -1,0 +1,17 @@
+[Unit]
+Description=Zot Registry
+Documentation=https://zotregistry.dev/
+After=network.target auditd.service local-fs.target
+
+[Service]
+Type=simple
+ExecStart={{ zot_binary_path }} serve {{ zot_config_directory }}/config.yaml
+Restart=on-failure
+User=root
+Group=root
+LimitNOFILE=500000
+MemoryHigh=30G
+MemoryMax=32G
+
+[Install]
+WantedBy=multi-user.target

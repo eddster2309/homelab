@@ -1,0 +1,59 @@
+# - name: Deploy infrastructure
+#   hosts: localhost
+#   vars_files:
+#     - vars/repos.yaml
+#   tasks:
+#     - name: Deploy repos nodes on proxmox
+#       ansible.builtin.include_role:
+#         name: node_create
+
+- name: Deploy Repos
+  hosts: pve_ans_repos
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars/repos.yaml
+  tasks:
+    - name: Configure Repos
+      ansible.builtin.include_role:
+        name: configure_repos
+
+    - name: Install keepalived
+      ansible.builtin.include_role:
+        name: evrardjp.keepalived
+      vars:
+        keepalived_show_ansible_managed: true
+        keepalived_instances:
+          internal:
+            interface: "{{ ansible_default_ipv4.interface }}"
+            state: "{{ (groups['pve_ans_repos'].index(inventory_hostname) == 0) | ternary('MASTER', 'BACKUP') }}"
+            virtual_router_id: "{{ vrrp_id | default(42) }}"
+            priority: "{{ (inventory_hostname == groups['pve_ans_repos'][0]) | ternary('200', '100') }}"
+            vips:
+              - "{{ repos_vip }}/{{ repos_vip_mask }} dev {{ ansible_default_ipv4.interface }}"
+
+- name: Create DNS records
+  hosts: pve_ans_ipa_primary
+  vars_files:
+    - vars/repos.yaml
+  tasks:
+    - name: Create Root DNS record
+      freeipa.ansible_freeipa.ipadnsrecord:
+        zone_name: "{{ mirror_subdomain }}"
+        record_name: "@"
+        record_type: "A"
+        record_value:
+          - "{{ repos_vip }}"
+        state: present
+        ipaadmin_password: "{{ ipaadmin_password }}"
+
+    - name: Create DNS records
+      freeipa.ansible_freeipa.ipadnsrecord:
+        zone_name: "{{ mirror_subdomain }}"
+        record_name: "{{ item.name }}"
+        record_type: "A"
+        record_value:
+          - "{{ repos_vip }}"
+        state: present
+        ipaadmin_password: "{{ ipaadmin_password }}"
+      loop: "{{ mirrors }}"
