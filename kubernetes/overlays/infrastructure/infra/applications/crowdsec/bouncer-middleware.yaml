@@ -1,0 +1,37 @@
+# Attached to traefik's websecure-pub entrypoint (traefik-patch.yaml), so it
+# covers everything edge01 forwards and nothing internal. Lives here rather
+# than in the traefik namespace because traefik resolves urn:k8s:secret from
+# the Middleware's own namespace.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: bouncer
+spec:
+  plugin:
+    crowdsec:
+      enabled: true
+      # Bans are pulled from LAPI every updateIntervalSeconds rather than
+      # looked up per request.
+      crowdsecMode: stream
+      crowdsecLapiScheme: http
+      crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080
+      crowdsecLapiKey: urn:k8s:secret:crowdsec-bouncer-key:password
+      updateIntervalSeconds: 60
+      # Keep serving the last ban list if LAPI is down, rather than blocking.
+      updateMaxFailure: -1
+      # Inline check of every request. This is what stops a burst like the
+      # 3-second .php scan; a ban from the logs would land after it ended.
+      crowdsecAppsecEnabled: true
+      crowdsecAppsecHost: crowdsec-appsec-service.crowdsec.svc.cluster.local:7422
+      # Fail open: a CrowdSec outage must not take the public sites down.
+      crowdsecAppsecFailureBlock: false
+      crowdsecAppsecUnreachableBlock: false
+      # Only the head of a body is inspected, so git pushes and Loki/remote-write
+      # ingest are not buffered in full.
+      crowdsecAppsecBodyLimit: 65536
+      # PROXY protocol already puts the real client in RemoteAddr, and nothing
+      # in front of traefik sets X-Forwarded-For, so no forwarded-header trust.
+      # edge01's own pushes (REDACTED_IP) and LAN clients skip the checks.
+      clientTrustedIPs:
+        - REDACTED_IP/8
+        - REDACTED_IP/16

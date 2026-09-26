@@ -1,0 +1,147 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: traefik
+spec:
+  values:
+    deployment:
+      kind: DaemonSet
+      podAnnotations:
+        reloader.stakater.com/auto: "true"
+
+    ingressClass:
+      enabled: true
+      isDefaultClass: true
+
+    service:
+      type: LoadBalancer
+      annotations:
+        lbipam.cilium.io/ips: "REDACTED_IP"
+        lbipam.cilium.io/sharing-key: "traefik"
+        lbipam.cilium.io/sharing-cross-namespace: "traefik,monitoring"
+      spec:
+        externalTrafficPolicy: Cluster
+
+    ports:
+      # web and websecure are the defaults: a router without an explicit
+      # entrypoint only ever joins these, never websecure-pub.
+      # web only redirects to websecure, so it opts out of access logs.
+      web:
+        asDefault: true
+        observability:
+          accessLogs: false
+      # No PROXY protocol here: only edge01 sends it, and only to websecure-pub.
+      # Logs internal requests for the traefik-internal dashboard; metric and
+      # log ingest routed through here is dropped by Alloy (k8s-monitoring-patch).
+      websecure:
+        asDefault: true
+      # Public entrypoint for edge01. Only routers that opt in with
+      # traefik.ingress.kubernetes.io/router.entrypoints: websecure,websecure-pub
+      # are reachable here, so a forged Host header behind an allowed SNI can't
+      # reach an internal-only app. (Port names cap at 15 chars, hence -pub.)
+      websecure-pub:
+        port: 8444
+        exposedPort: 8443
+        protocol: TCP
+        expose:
+          default: true
+        http:
+          tls:
+            enabled: true
+          # CrowdSec bouncer (crowdsec overlay): refuses banned sources and runs
+          # every public request past the AppSec WAF before it is routed.
+          middlewares:
+            - crowdsec-bouncer@kubernetescrd
+        proxyProtocol:
+          trustedIPs:
+            - REDACTED_IP/32 # edge01 over WireGuard
+            # Nodes, in case externalTrafficPolicy: Cluster SNATs edge01's
+            # traffic. Confirm the real source in the access logs, then narrow.
+            - REDACTED_IP/32
+            - REDACTED_IP/32
+            - REDACTED_IP/32
+      # TCP entrypoints to replace ingress-nginx TCP mappings.
+      # IngressRouteTCP resources will route these when GitLab/Frigate are migrated.
+      gitlab-shell:
+        port: 2222
+        exposedPort: 222
+        protocol: TCP
+        expose:
+          default: true
+      frigate-rtsp:
+        port: 8554
+        exposedPort: 8554
+        protocol: TCP
+        expose:
+          default: true
+
+    # HTTP -> HTTPS redirect via CLI flags (avoids Helm schema validation on ports.web)
+    additionalArguments:
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--global.sendanonymoususage=false"
+
+    # Fetched from plugins.traefik.io at startup. If that fails the bouncer
+    # middleware is missing and every websecure-pub router errors, so the
+    # public sites go down until traefik restarts with the plugin loaded.
+    experimental:
+      plugins:
+        crowdsec:
+          moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+          version: v1.7.1
+
+    providers:
+      kubernetesIngress:
+        enabled: true
+        ingressClass: traefik
+        allowExternalNameServices: true
+      kubernetesCRD:
+        enabled: true
+        allowCrossNamespace: true
+
+    ingressRoute:
+      dashboard:
+        enabled: true
+        matchRule: Host(`traefik.0b.au`)
+        entryPoints:
+          - websecure
+        middlewares:
+          - name: authelia
+        annotations:
+          external-dns.alpha.kubernetes.io/hostname: traefik.0b.au
+          external-dns.alpha.kubernetes.io/target: "REDACTED_IP"
+
+    metrics:
+      prometheus:
+        serviceMonitor:
+          enabled: true
+
+    # websecure-pub is edge01's public traffic. HAProxy passes TLS through, so
+    # this is the only place per-host status codes and the real client address
+    # (via PROXY protocol) are visible. Feeds the "Public traffic" row of the
+    # edge01 dashboard. websecure (internal) also logs, for traefik-internal.
+    accessLog:
+      enabled: true
+      format: json
+      fields:
+        defaultMode: keep
+        headers:
+          defaultMode: drop
+          names:
+            User-Agent: keep
+        # OIDC callbacks on auth.0b.au carry the authorization code and state in
+        # the query string.
+        queryParameters:
+          defaultMode: drop
+
+    tlsOptions:
+      default:
+        minVersion: VersionTLS12
+        cipherSuites:
+          - TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384
+          - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384
+          - TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256
+          - TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256
+          - TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256
+          - TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256

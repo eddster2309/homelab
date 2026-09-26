@@ -1,0 +1,21 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: coder
+spec:
+  install:
+    remediation:
+      retries: -1
+  upgrade: 
+    remediation:
+      retries: -1
+  interval: 30m
+  chart:
+    spec:
+      chart: coder
+      version: "*"
+      sourceRef:
+        kind: HelmRepository
+        name: coder
+        namespace: flux-system
+      interval: 12h

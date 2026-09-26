@@ -1,0 +1,45 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: gitlab
+resources:
+- ../../../../../bases/gitlab
+- postgres.yaml
+- ./secrets
+- gitlab-shell-tcp.yaml
+- dragonfly.yaml
+components:
+- ../../../../../components/ca-certs
+- ../../../../../components/cnpg-barman-backup
+patches:
+- target:
+    kind: HelmRelease
+  path: gitlab-patch.yaml
+- target:
+    kind: ScheduledBackup
+    name: cnpg-nightly-backup
+  patch: |
+    - op: replace
+      path: /spec/cluster/name
+      value: gitlab-db
+- target:
+    kind: RoleBinding
+    name: cnpg-backup-s3-reader
+  patch: |
+    - op: replace
+      path: /subjects/0/name
+      value: gitlab-db
+- target:
+    kind: Namespace
+  patch: |
+    - op: add
+      path: /metadata/labels
+      value:
+        app: gitlab
+transformers:
+  - |-
+    apiVersion: builtin
+    kind: NamespaceTransformer
+    metadata:
+      name: gitlab
+      labels:
+        app: gitlab

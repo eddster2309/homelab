@@ -1,0 +1,46 @@
+- name: Create DNS Zones
+  freeipa.ansible_freeipa.ipadnszone:
+    name: "{{ item.name }}"
+    skip_overlap_check: true
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  loop: "{{ ipa_dns_zones }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Create Reverse DNS Zones
+  freeipa.ansible_freeipa.ipadnszone:
+    name_from_ip: "{{ item.ip }}"
+    dynamic_update: "{{ item.dynamic_update }}"
+    allow_sync_ptr: "{{ item.allow_sync_ptr }}"
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  loop: "{{ ipa_dns_reverse_zones }}"
+  loop_control:
+    label: "{{ item.ip }}"
+
+- name: Create DNS records for ipa servers
+  freeipa.ansible_freeipa.ipadnsrecord:
+    zone_name: "{{ dns_zone | community.dns.get_registrable_domain }}"
+    name: "{{ item + '.' + dns_zone | regex_replace('.' + (dns_zone | community.dns.get_registrable_domain) + '$', '') }}"
+    record_type: A
+    record_value: "{{ hostvars[item].ansible_host }}"
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  with_inventory_hostnames:
+    - pve_ans_ipa
+  when:
+    - hostvars[item].ansible_host is defined
+    - dns_zone | community.dns.get_registrable_domain in ipa_dns_zones | map(attribute='name') | list
+
+- name: Create DNS Records
+  freeipa.ansible_freeipa.ipadnsrecord:
+    zone_name: "{{ item.0.name }}"
+    name: "{{ item.1.name }}"
+    record_type: "{{ item.1.type }}"
+    record_value: "{{ item.1.value }}"
+    state: present
+    ipaadmin_password: "{{ ipaadmin_password }}"
+  loop: "{{ query('subelements', ipa_dns_zones, 'records', {'skip_missing': True}) }}"
+  loop_control:
+    label: "{{ item.1.name }}.{{ item.0.name }}"

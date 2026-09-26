@@ -1,0 +1,31 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: whoami
+spec:
+  chart:
+    spec:
+      chart: whoami
+      version: "6.0.0"
+      # Lets Renovate resolve the pinned version; must match the base.
+      sourceRef:
+        kind: HelmRepository
+        name: cowboysysop
+        namespace: flux-system
+  values:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 16Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi
+    ingress:
+      enabled: true
+      ingressClassName: "traefik"
+      annotations:
+        traefik.ingress.kubernetes.io/router.middlewares: traefik-authelia@kubernetescrd
+      hosts:
+        - host: whoami.0b.au
+          paths:
+            - /

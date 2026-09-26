@@ -1,0 +1,17 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: couchdb
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  path: ./kubernetes/overlays/apps/infra/applications/couchdb
+  healthChecks:
+    - kind: HelmRelease
+      name: couchdb
+      namespace: couchdb
+      apiVersion: helm.toolkit.fluxcd.io/v2
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system

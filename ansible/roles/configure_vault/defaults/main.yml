@@ -1,0 +1,4 @@
+---
+# defaults file for configure_vault
+configure_vault_certificate_dir: /opt/certs
+configure_vault_iptables_config_path: /etc/sysconfig/iptables

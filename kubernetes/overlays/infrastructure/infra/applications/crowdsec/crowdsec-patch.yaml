@@ -1,0 +1,131 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: crowdsec
+spec:
+  values:
+    container_runtime: containerd
+
+    lapi:
+      env:
+        # Fully offline: no Central API, so no signals, usage metrics or
+        # console, and no community blocklist in return. Hub content (scenarios,
+        # rules) is still downloaded at startup.
+        - name: DISABLE_ONLINE_API
+          value: "true"
+        # Registers the traefik bouncer with the generated key on every start.
+        - name: BOUNCER_KEY_traefik
+          valueFrom:
+            secretKeyRef:
+              name: crowdsec-bouncer-key
+              key: password
+      podAnnotations:
+        reloader.stakater.com/auto: "true"
+      persistentVolume:
+        data:
+          storageClassName: longhorn
+        config:
+          storageClassName: longhorn
+      metrics:
+        serviceMonitor:
+          enabled: true
+
+    # Reads traefik's JSON access logs. Bans from here are for repeat visits:
+    # the bouncer pulls them once a minute, so they land after a short burst.
+    agent:
+      acquisition:
+        - namespace: traefik
+          podName: traefik-*
+          program: traefik
+          # /var/log/containers entries are symlinks, so inotify never sees
+          # containerd rotate the file underneath and the tail silently stops.
+          poll_without_inotify: true
+      env:
+        - name: COLLECTIONS
+          value: crowdsecurity/traefik
+        # Private ranges never get a decision: LAN clients and edge01's own
+        # pushes over the tunnel.
+        - name: PARSERS
+          value: crowdsecurity/whitelists
+        # 40+ non-static GETs in ~20s is ordinary use of the Coder and GitLab
+        # UIs, and Coder is used from Azure, so this would ban the owner.
+        - name: DISABLE_SCENARIOS
+          value: crowdsecurity/http-crawl-non_statics
+      metrics:
+        serviceMonitor:
+          enabled: true
+
+    # Inline WAF the bouncer consults on every public request.
+    appsec:
+      enabled: true
+      metrics:
+        serviceMonitor:
+          enabled: true
+      acquisitions:
+        - source: appsec
+          listen_addr: "REDACTED_IP:7422"
+          path: /
+          appsec_config: homelab/appsec
+          labels:
+            type: appsec
+      env:
+        - name: COLLECTIONS
+          value: crowdsecurity/appsec-virtual-patching crowdsecurity/appsec-generic-rules
+      configs:
+        homelab-appsec.yaml: |
+          name: homelab/appsec
+          default_remediation: ban
+          inband_rules:
+            - crowdsecurity/base-config
+            - crowdsecurity/vpatch-*
+            - crowdsecurity/generic-*
+            - homelab/no-php
+          pre_eval:
+            # Coder workspace apps are whatever is being developed, which may
+            # well be PHP.
+            - filter: IsInBand == true && req.Host endsWith ".coder.0b.au"
+              apply:
+                - RemoveInBandRuleByName("homelab/no-php")
+      rules:
+        homelab-no-php.yaml: |
+          name: homelab/no-php
+          description: "PHP request to a public site that serves no PHP"
+          rules:
+            # Coder, GitLab, Authelia and Pages serve no PHP, so any .php path
+            # is a scanner (e.g. REDACTED_IP's webshell sweep). A "-" segment
+            # is skipped so GitLab's /-/blob/ and /-/raw/ views of .php files
+            # in a repo still work.
+            - zones:
+                - URI
+              transform:
+                - lowercase
+              match:
+                type: regex
+                value: '^(/([^/-][^/]*|-[^/]+))*/[^/]*\.php$'
+          labels:
+            type: scan
+            service: http
+            behavior: "http:scan"
+            confidence: 3
+            spoofable: 0
+            label: "PHP probe"
+      scenarios:
+        # crowdsecurity/appsec-vpatch only bans after two *distinct* rules
+        # match, so a scanner tripping only no-php would be refused request by
+        # request but never banned. Two hits within 10s is enough.
+        homelab-no-php-ban.yaml: |
+          type: leaky
+          name: homelab/no-php-ban
+          description: "Ban sources of repeated PHP probes"
+          filter: "evt.Meta.log_type == 'appsec-block' && evt.Meta.rule_name == 'homelab/no-php'"
+          groupby: evt.Meta.source_ip
+          capacity: 1
+          leakspeed: 10s
+          blackhole: 1m
+          labels:
+            service: http
+            behavior: "http:scan"
+            confidence: 3
+            spoofable: 0
+            label: "Repeated PHP probes"
+            remediation: true

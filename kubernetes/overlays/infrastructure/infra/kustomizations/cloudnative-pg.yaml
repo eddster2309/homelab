@@ -1,0 +1,21 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cloudnative-pg
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  path: ./kubernetes/overlays/infrastructure/infra/applications/cloudnative-pg
+  dependsOn: 
+    - name: repositories-infra
+    - name: longhorn
+  healthChecks:
+    - kind: HelmRelease
+      name: cloudnative-pg
+      namespace: cloudnative-pg
+      apiVersion: helm.toolkit.fluxcd.io/v2beta1
+  prune: false
+  sourceRef:
+    kind: "GitRepository"
+    name: "flux-system"

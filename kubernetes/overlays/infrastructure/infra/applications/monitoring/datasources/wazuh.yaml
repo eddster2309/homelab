@@ -1,0 +1,64 @@
+# Wazuh indexer (OpenSearch) on wazuh01, via its nginx on 9200. Rendered as a
+# Secret so the read-only indexer password never sits in a ConfigMap; the
+# datasource sidecar watches Secrets with this label too.
+# Vault: k8s-infra/monitoring/wazuh-grafana -> password (same value as garage
+# vault.yml vault_wazuh_grafana_password).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: grafana-datasource-wazuh
+spec:
+  refreshInterval: "15s"
+  secretStoreRef:
+    name: vault-backend
+    kind: ClusterSecretStore
+  target:
+    name: grafana-datasource-wazuh
+    creationPolicy: 'Owner'
+    template:
+      engineVersion: v2
+      metadata:
+        labels:
+          grafana_datasource: "1"
+      data:
+        wazuh.yaml: |-
+          apiVersion: 1
+          datasources:
+            - name: Wazuh alerts
+              uid: wazuh-alerts
+              type: grafana-opensearch-datasource
+              access: proxy
+              url: https://wazuh.internal:9200
+              basicAuth: true
+              basicAuthUser: grafana
+              jsonData:
+                database: 'wazuh-alerts-*'
+                timeField: timestamp
+                # The indexer reports 7.10.2 for compatibility; it is OpenSearch 2.19.
+                flavor: opensearch
+                version: '2.19.0'
+                logMessageField: full_log
+                logLevelField: rule.level
+                maxConcurrentShardRequests: 5
+              secureJsonData:
+                basicAuthPassword: '{{ .password }}'
+            - name: Wazuh vulnerabilities
+              uid: wazuh-vulnerabilities
+              type: grafana-opensearch-datasource
+              access: proxy
+              url: https://wazuh.internal:9200
+              basicAuth: true
+              basicAuthUser: grafana
+              jsonData:
+                database: 'wazuh-states-vulnerabilities-*'
+                timeField: vulnerability.detected_at
+                flavor: opensearch
+                version: '2.19.0'
+                maxConcurrentShardRequests: 5
+              secureJsonData:
+                basicAuthPassword: '{{ .password }}'
+  data:
+    - secretKey: password
+      remoteRef:
+        key: monitoring/wazuh-grafana
+        property: password

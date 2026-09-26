@@ -1,0 +1,29 @@
+- name: Install requirements
+  ansible.builtin.package:
+    name:
+      - git
+      - vim
+      - tmux
+      - htop
+      - python3-pip
+      - fzf
+      - gnome-desktop4
+      - gnome-session-wayland-session
+      - gnome-classic-session
+      - gnome-control-center
+      - gnome-panel
+      - tilix
+      - firefox
+      - gnome-calculator
+      - gnome-disk-utility
+      - gnome-logs
+      - gnome-usage
+      - gnome-system-monitor
+      - gnome-session-xsession
+    state: present
+
+- name: Install pip requirements
+  ansible.builtin.pip:
+    name:
+      - pipx
+      - psutil
