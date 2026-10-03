@@ -1,0 +1,29 @@
+apiVersion: renovate-operator.mogenius.com/v1alpha1
+kind: RenovateJob
+metadata:
+  name: renovate-github
+spec:
+  schedule: "0 * * * *"
+  secretRef: renovate-secret
+  provider:
+    name: github
+  image: ghcr.io/renovatebot/renovate:44.115.10
+  parallelism: 2
+  discoveryFilters:
+    - eddster2309/homelab-infra
+  extraEnv:
+    # Author commits as the PAT owner instead of Renovate's default
+    # renovate@whitesourcesoftware.com, a Mend-owned account with vigilant mode
+    # on that flags every commit here as Unverified.
+    - name: RENOVATE_GIT_AUTHOR
+      value: "Renovate Bot <16095534+eddster2309@users.noreply.github.com>"
+    # allowInternal is admin-only, so it can't live in the repo's
+    # renovate.json. These resolve to internal IPs but serve public certs.
+    - name: RENOVATE_HOST_RULES
+      value: >-
+        [{"matchHost": "https://git.0b.au", "allowInternal": true},
+        {"matchHost": "https://registry.git.0b.au", "allowInternal": true}]
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi

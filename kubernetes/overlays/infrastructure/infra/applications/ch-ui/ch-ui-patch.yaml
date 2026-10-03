@@ -1,0 +1,47 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ch-ui
+spec:
+  values:
+    # CH-UI for the netflow ClickHouse. OIDC is a Pro (paid) feature, so
+    # Authelia forward-auth is the only SSO; behind it you log in with a
+    # ClickHouse user: grafana (read-only) or admin, both in Vault at
+    # k8s-infra/netflow/clickhouse.
+    existingSecret: ch-ui
+    existingSecretKey: app-secret-key
+    env:
+      CLICKHOUSE_URL: http://clickhouse-netflow.netflow.svc:8123
+      CONNECTION_NAME: netflow
+      APP_URL: https://ch-ui.0b.au
+    # The image's USER is the name "chui" (alpine adduser -S: 100/101), and the
+    # chart's runAsNonRoot can't verify a name, so the pod won't start without
+    # the numeric ids.
+    podSecurityContext:
+      fsGroup: 101
+    securityContext:
+      runAsUser: 100
+      runAsGroup: 101
+    persistence:
+      enabled: true
+      storageClass: longhorn
+      size: 1Gi
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        memory: 512Mi
+    # TLS comes from the traefik TLSStore wildcard.
+    ingress:
+      enabled: true
+      className: traefik
+      annotations:
+        traefik.ingress.kubernetes.io/router.middlewares: traefik-authelia@kubernetescrd
+      hosts:
+        - host: ch-ui.0b.au
+          paths:
+            - path: /
+              pathType: Prefix
+    podAnnotations:
+      reloader.stakater.com/auto: "true"

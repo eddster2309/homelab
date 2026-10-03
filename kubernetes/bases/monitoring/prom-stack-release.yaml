@@ -1,0 +1,67 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: prom-stack
+  namespace: monitoring
+spec:
+  dependsOn: []
+  install:
+    remediation:
+      retries: -1
+  upgrade: 
+    remediation:
+      retries: -1
+  interval: 30m
+  chart:
+    spec:
+      chart: kube-prometheus-stack
+      version: "*"
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community
+        namespace: flux-system
+      interval: 12h
+  values:
+    crds:
+      enable: true
+    defaultRules:
+      create: false
+    global:
+      rbac:
+        create: true
+    alertmanager:
+      enabled: false
+    grafana:
+      enabled: false
+    kubeApiServer:
+      enabled: false
+    kubelet:
+      enabled: false
+    kubeControllerManager:
+      enabled: false
+    coreDns:
+      enabled: false
+    kubeEtcd:
+      enabled: false
+    kubeScheduler:
+      enabled: false
+    kubeProxy:
+      enabled: false
+    kubeStateMetrics:
+      enabled: false
+    kube-state-metrics:
+      rbac:
+        create: false
+      prometheus:
+        monitor:
+          enabled: false
+    nodeExporter:
+      enabled: false
+    prometheus-node-exporter:
+      prometheus:
+        monitor:
+          enabled: false
+    prometheusOperator:
+      enabled: true
+    prometheus:
+      enabled: false

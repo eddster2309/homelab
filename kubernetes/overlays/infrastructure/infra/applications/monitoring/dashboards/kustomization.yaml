@@ -1,0 +1,6 @@
+namespace: monitoring
+resources: 
+- authelia.yaml
+- cilium.yaml
+- longhorn.yaml
+- wazuh.yaml

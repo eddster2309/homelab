@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: traefik
+  labels:
+    app: traefik
+    role: ingress-controller
+  annotations:
+    lbipam.cilium.io/sharing-cross-namespace: "traefik,monitoring"

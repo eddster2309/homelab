@@ -1,0 +1,11 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: mariadb-operator
+  namespace: flux-system
+spec:
+  interval: 24h
+  # The vendor domain (helm.mariadb.com) is the one the upstream docs point at,
+  # but it does not resolve from inside the cluster. The GitHub Pages mirror
+  # serves the identical chart index.
+  url: https://mariadb-operator.github.io/mariadb-operator

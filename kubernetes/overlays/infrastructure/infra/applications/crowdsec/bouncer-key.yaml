@@ -1,0 +1,29 @@
+# The traefik bouncer's LAPI key. Generated in-cluster rather than kept in
+# Vault: it only ever passes between LAPI and traefik, both of which read it
+# from this Secret. CreatedOnce, so it is not regenerated on every refresh.
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: crowdsec-bouncer-key
+spec:
+  length: 48
+  digits: 10
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: crowdsec-bouncer-key
+spec:
+  refreshPolicy: CreatedOnce
+  target:
+    name: crowdsec-bouncer-key
+    creationPolicy: Owner
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: crowdsec-bouncer-key

@@ -1,0 +1,73 @@
+# Suricata EVE receiver (Vector). Config: ./vector.yaml (ConfigMap eve-receiver-config).
+# OPNsense streams eve.json lines to REDACTED_IP:5514/tcp; see ../README.md "Suricata".
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eve-receiver
+  labels:
+    app: eve-receiver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: eve-receiver
+  template:
+    metadata:
+      labels:
+        app: eve-receiver
+      annotations:
+        reloader.stakater.com/auto: "true"
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+      containers:
+        - name: vector
+          image: timberio/vector:0.58.0-alpine
+          args: [--config, /etc/vector/vector.yaml]
+          ports:
+            - name: eve
+              containerPort: 5514
+              protocol: TCP
+            - name: metrics
+              containerPort: 9598
+              protocol: TCP
+          volumeMounts:
+            - name: config
+              mountPath: /etc/vector
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/vector
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+      volumes:
+        - name: config
+          configMap:
+            name: eve-receiver-config
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eve-receiver
+  annotations:
+    # Shares goflow2's IP (different port)
+    lbipam.cilium.io/ips: "REDACTED_IP"
+    lbipam.cilium.io/sharing-key: "netflow"
+spec:
+  type: LoadBalancer
+  # Cluster, not Local: same Cilium L2 announcement reason as goflow2-service.yaml
+  externalTrafficPolicy: Cluster
+  selector:
+    app: eve-receiver
+  ports:
+    - name: eve
+      port: 5514
+      targetPort: 5514
+      protocol: TCP

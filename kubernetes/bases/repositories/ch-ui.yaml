@@ -1,0 +1,16 @@
+# CH-UI publishes no Helm repository; the chart lives in the app repo at
+# deploy/helm/ch-ui. Tracking release tags keeps chart and image in step
+# (the chart's appVersion is the image tag).
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: ch-ui
+  namespace: flux-system
+spec:
+  interval: 12h
+  url: https://github.com/caioricciuti/ch-ui
+  ref:
+    semver: ">=2.0.0"
+  ignore: |
+    /*
+    !/deploy/helm/

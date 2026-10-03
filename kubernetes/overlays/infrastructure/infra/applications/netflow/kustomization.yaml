@@ -1,0 +1,37 @@
+namespace: netflow
+resources:
+- ./namespace.yaml
+- ./secrets
+- ./kafka/kafka.yaml
+- ./kafka/topic.yaml
+- ./kafka/metrics.yaml
+- ./scrapes.yaml
+- ./geoip-pvc.yaml
+- ./geoip-cronjob.yaml
+- ./clickhouse/chi.yaml
+- ./clickhouse/schema-job.yaml
+- ./enrich/dns-tail.yaml
+- ./enrich/intel-update.yaml
+- ./goflow2-deployment.yaml
+- ./goflow2-service.yaml
+- ./eve/receiver.yaml
+configMapGenerator:
+# Hash suffix changes the Job spec on every SQL edit, so Flux recreates it
+- name: clickhouse-schema
+  files:
+  - ./clickhouse/schema/01-dictionaries.sql
+  - ./clickhouse/schema/02-intel.sql
+  - ./clickhouse/schema/02-netbox.sql
+  - ./clickhouse/schema/03-flows.sql
+  - ./clickhouse/schema/04-rollup.sql
+  - ./clickhouse/schema/05-eve.sql
+# enrich/ code: dns-tail Deployment + intel-update CronJob (hash suffix rolls both on change)
+- name: netflow-enrich-code
+  files:
+  - ./enrich/chclient.py
+  - ./enrich/dns_tail.py
+  - ./enrich/intel_update.py
+# eve/ receiver: Suricata EVE from OPNsense -> Kafka topic eve (hash suffix rolls the Deployment)
+- name: eve-receiver-config
+  files:
+  - ./eve/vector.yaml

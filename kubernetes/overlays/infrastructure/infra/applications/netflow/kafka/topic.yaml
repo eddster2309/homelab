@@ -1,0 +1,26 @@
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: flows
+  labels:
+    strimzi.io/cluster: netflow
+spec:
+  partitions: 1
+  replicas: 1
+  config:
+    retention.ms: 86400000        # 24h — ClickHouse is the store
+    retention.bytes: 5368709120   # 5GiB cap
+---
+# Suricata EVE events (tls/http/alert) from eve-receiver; read by netflow.eve_queue
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: eve
+  labels:
+    strimzi.io/cluster: netflow
+spec:
+  partitions: 1
+  replicas: 1
+  config:
+    retention.ms: 86400000        # 24h — ClickHouse is the store
+    retention.bytes: 1073741824   # 1GiB cap

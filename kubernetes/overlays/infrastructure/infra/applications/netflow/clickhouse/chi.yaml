@@ -1,0 +1,131 @@
+# Single-node ClickHouse: 1 shard, 1 replica, plain MergeTree, so no Keeper.
+# Service: clickhouse-netflow:8123 (HTTP) / :9000 (native).
+#
+# No reloader annotation: the operator owns the StatefulSet and would fight
+# Reloader's edits. Passwords are injected as env from clickhouse-credentials;
+# after rotating one, bump spec.taskID to make the operator roll the pod.
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: netflow
+spec:
+  defaults:
+    templates:
+      podTemplate: clickhouse
+      dataVolumeClaimTemplate: data
+  configuration:
+    users:
+      admin/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: admin_password
+      admin/networks/ip: "::/0"
+      admin/profile: default
+      admin/access_management: 1
+      grafana/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: grafana_password
+      grafana/networks/ip: "::/0"
+      grafana/profile: grafana
+      # netbox-sync (netbox namespace) refreshes the NetBox lookup tables; it can
+      # only touch netflow.nb_* (fill <t>_new, then EXCHANGE TABLES). It also reads
+      # flows (hourly) to find the ports LAN hosts serve on.
+      netbox_sync/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: netbox_sync_password
+      netbox_sync/networks/ip: "::/0"
+      netbox_sync/profile: default
+      netbox_sync/grants/query:
+        - "GRANT SELECT, INSERT, TRUNCATE, CREATE TABLE, DROP TABLE ON netflow.nb_*"
+        - "GRANT SELECT ON netflow.flows"
+        - "GRANT dictGet ON netflow.port_names_dict"
+      # enrich/ (dns-tail, intel-update): its own tables, plus the late domain
+      # fixup (ALTER UPDATE on flows) and the domain rollup.
+      enricher/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: enricher_password
+      enricher/networks/ip: "::/0"
+      enricher/profile: default
+      enricher/grants/query:
+        - "GRANT SELECT, INSERT, TRUNCATE, CREATE TABLE, DROP TABLE ON netflow.intel_*"
+        - "GRANT SELECT, INSERT, TRUNCATE, CREATE TABLE, DROP TABLE ON netflow.port_names*"
+        - "GRANT SELECT, INSERT ON netflow.dns_answers"
+        - "GRANT SELECT, INSERT ON netflow.conn_domains"
+        - "GRANT SELECT, INSERT ON netflow.flows_domain_5m"
+        - "GRANT SELECT, ALTER UPDATE ON netflow.flows"
+        - "GRANT dictGet ON netflow.*"
+    files:
+      # ClickHouse's own logs (system.*_log): several default to no TTL at all,
+      # ~150 MB/day that would never be deleted. Cap every one at 7 days, and
+      # keep text_log to warnings. query_log/part_log/trace_log get a whole
+      # <engine> instead: the operator's defaults set one for them, and
+      # ClickHouse refuses <ttl> alongside an <engine> (it crash-loops).
+      # Changing a log table's TTL makes ClickHouse
+      # rename the old table to <name>_N on restart; drop those by hand.
+      config.d/system_logs.xml: |
+        <clickhouse>
+          <asynchronous_insert_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></asynchronous_insert_log>
+          <asynchronous_metric_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></asynchronous_metric_log>
+          <background_schedule_pool_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></background_schedule_pool_log>
+          <error_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></error_log>
+          <metric_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></metric_log>
+          <part_log><engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 7 DAY</engine></part_log>
+          <processors_profile_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></processors_profile_log>
+          <query_log><engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 7 DAY</engine></query_log>
+          <query_metric_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></query_metric_log>
+          <query_views_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></query_views_log>
+          <text_log><level>warning</level><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></text_log>
+          <trace_log><engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 7 DAY</engine></trace_log>
+        </clickhouse>
+    profiles:
+      # readonly=2: read-only, but the Grafana plugin may still set query settings
+      grafana/readonly: 2
+    clusters:
+      - name: netflow
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  templates:
+    podTemplates:
+      - name: clickhouse
+        spec:
+          # As root the image entrypoint chowns everything under
+          # /var/lib/clickhouse and dies on the read-only geoip mount.
+          securityContext:
+            runAsUser: 101
+            runAsGroup: 101
+            fsGroup: 101
+          containers:
+            - name: clickhouse
+              image: clickhouse/clickhouse-server:26.8
+              volumeMounts:
+                # FILE dictionary sources must live under user_files_path
+                - name: geoip-db
+                  mountPath: /var/lib/clickhouse/user_files/geoip
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 1Gi
+                limits:
+                  memory: 4Gi
+          volumes:
+            - name: geoip-db
+              persistentVolumeClaim:
+                claimName: geoip-db
+    volumeClaimTemplates:
+      - name: data
+        spec:
+          storageClassName: longhorn
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 30Gi

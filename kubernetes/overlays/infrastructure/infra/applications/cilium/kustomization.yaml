@@ -1,0 +1,6 @@
+namespace: kube-system
+resources: 
+  - cilium-helmchart-config.yaml
+  - lb-pool.yaml
+  - l2-policy.yaml
+  # - host-access-policy.yaml

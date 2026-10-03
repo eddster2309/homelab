@@ -1,0 +1,76 @@
+# Fetches MaxMind GeoLite2 City + ASN as CSV (geoipupdate only does mmdb) for
+# the ClickHouse IP_TRIE dictionaries. v4 and v6 blocks are merged into one
+# file per dictionary; files are staged then mv'd so ClickHouse never reads a
+# partial file. ClickHouse reloads a FILE dictionary when its mtime changes.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: geoipupdate
+  labels:
+    app: geoipupdate
+spec:
+  schedule: "0 3 * * 3"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: geoipupdate
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: geoipupdate
+              image: alpine:3.24
+              command: [sh, -ec]
+              args:
+                - |
+                  apk add --no-cache curl unzip >/dev/null
+                  work=$(mktemp -d)
+                  cd "$work"
+                  for ed in GeoLite2-City-CSV GeoLite2-ASN-CSV; do
+                    curl -fsSL -u "$GEOIPUPDATE_ACCOUNT_ID:$GEOIPUPDATE_LICENSE_KEY" \
+                      -o "$ed.zip" \
+                      "https://download.maxmind.com/geoip/databases/$ed/download?suffix=zip"
+                    unzip -q -j "$ed.zip" -d "$ed"
+                  done
+                  out=/geoip/.staging
+                  mkdir -p "$out"
+                  { cat GeoLite2-City-CSV/GeoLite2-City-Blocks-IPv4.csv
+                    tail -n +2 GeoLite2-City-CSV/GeoLite2-City-Blocks-IPv6.csv
+                  } > "$out/city-blocks.csv"
+                  cp GeoLite2-City-CSV/GeoLite2-City-Locations-en.csv "$out/city-locations.csv"
+                  { cat GeoLite2-ASN-CSV/GeoLite2-ASN-Blocks-IPv4.csv
+                    tail -n +2 GeoLite2-ASN-CSV/GeoLite2-ASN-Blocks-IPv6.csv
+                  } > "$out/asn-blocks.csv"
+                  for f in city-blocks.csv city-locations.csv asn-blocks.csv; do
+                    mv "$out/$f" "/geoip/$f"
+                  done
+                  ls -l /geoip
+              env:
+                - name: GEOIPUPDATE_ACCOUNT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: maxmind-credentials
+                      key: GEOIPUPDATE_ACCOUNT_ID
+                - name: GEOIPUPDATE_LICENSE_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: maxmind-credentials
+                      key: GEOIPUPDATE_LICENSE_KEY
+              volumeMounts:
+                - name: geoip-db
+                  mountPath: /geoip
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+          volumes:
+            - name: geoip-db
+              persistentVolumeClaim:
+                claimName: geoip-db

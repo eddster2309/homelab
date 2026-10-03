@@ -1,0 +1,8 @@
+apiVersion: v1 
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    app: monitoring
+  annotations:
+    lbipam.cilium.io/sharing-cross-namespace: "traefik,monitoring"

@@ -1,0 +1,9 @@
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Provider
+metadata:
+  name: notify-from-longhorn
+  namespace: flux-system
+spec:
+  type: generic
+  address: http://notification-controller.flux-system.svc.cluster.local:9292/hook/8fa9ca97b64381c19314415c3c72c3b7a9e635acf6bf7cd20562f99e58f6d3cf

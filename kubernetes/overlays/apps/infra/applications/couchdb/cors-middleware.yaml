@@ -1,0 +1,21 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: couchdb-cors
+spec:
+  headers:
+    accessControlAllowOriginList:
+      - "*"
+    accessControlAllowHeaders:
+      - accept
+      - authorization
+      - content-type
+      - origin
+      - referer
+    accessControlAllowMethods:
+      - GET
+      - PUT
+      - POST
+      - HEAD
+      - DELETE
+    accessControlMaxAge: 600
