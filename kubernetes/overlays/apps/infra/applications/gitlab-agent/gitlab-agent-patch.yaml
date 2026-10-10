@@ -1,0 +1,14 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: gitlab-agent
+spec:
+  values:
+    replicas: 1
+    config:
+      kasAddress: "grpc://gitlab-kas.gitlab.svc.cluster.local:8150"
+      secretName: gitlab-agent-token
+    podAnnotations:
+      reloader.stakater.com/auto: "true"
+    rbac:
+      create: false

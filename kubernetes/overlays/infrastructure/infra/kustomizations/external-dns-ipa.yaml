@@ -1,0 +1,21 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: external-dns-ipa
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  path: ./kubernetes/overlays/infrastructure/infra/applications/external-dns-ipa
+  prune: true
+  dependsOn: 
+    - name: external-secrets-config
+    - name: repositories-infra
+  healthChecks:
+    - kind: HelmRelease
+      name: external-dns-ipa
+      namespace: external-dns-ipa
+      apiVersion: helm.toolkit.fluxcd.io/v2beta1
+  sourceRef:
+    kind: "GitRepository"
+    name: "flux-system"

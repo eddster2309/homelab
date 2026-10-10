@@ -1,0 +1,21 @@
+# Key for the "netflow" bouncer: netflow's intel-update job reads active decisions
+# with it to flag flows. Kept in Vault (unlike traefik's generated key) because a
+# second namespace (netflow) needs the same value.
+# Vault: k8s-infra/netflow/crowdsec -> bouncer_key
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: crowdsec-netflow-bouncer
+spec:
+  refreshInterval: "1h"
+  secretStoreRef:
+    name: vault-backend
+    kind: ClusterSecretStore
+  target:
+    name: crowdsec-netflow-bouncer
+    creationPolicy: 'Owner'
+  data:
+  - secretKey: key
+    remoteRef:
+      key: netflow/crowdsec
+      property: bouncer_key

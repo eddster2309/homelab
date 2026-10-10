@@ -1,0 +1,40 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: renovate-operator
+spec:
+  values:
+    # Authelia forward-auth is the outer gate, same as flux.0b.au; the UI then
+    # does its own OIDC login against Authelia and maps groups to access.
+    # TLS comes from the traefik TLSStore wildcard.
+    ingress:
+      enabled: true
+      ingressClassName: traefik
+      host: renovate.0b.au
+      annotations:
+        traefik.ingress.kubernetes.io/router.middlewares: traefik-authelia@kubernetescrd
+    auth:
+      oidc:
+        enabled: true
+        issuerUrl: https://auth.0b.au
+        clientId: renovate-operator
+        existingSecret: renovate-operator-oidc
+        secretKey: client-secret
+        sessionSecretKey: session-secret
+        # Auto-detection only picks https when ingress.tls is set, and TLS
+        # here comes from the TLSStore, so pin it.
+        redirectUrl: https://renovate.0b.au/auth/callback
+        additionalScopes:
+          - groups
+        # Authelia only puts groups in the userinfo response, not the ID token.
+        fetchUserInfoGroups: true
+    authorization:
+      defaults:
+        adminGroups:
+          - k8s-infra-admins
+    config:
+      # Keep a few days of finished job pods so logs are readable in the UI.
+      jobTTLSecondsAfterFinished: 259200
+    deployment:
+      podAnnotations:
+        reloader.stakater.com/auto: "true"

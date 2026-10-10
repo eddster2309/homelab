@@ -1,0 +1,21 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: clickhouse-operator
+spec:
+  interval: 30m
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      retries: -1
+  chart:
+    spec:
+      chart: altinity-clickhouse-operator
+      version: "*"
+      sourceRef:
+        kind: HelmRepository
+        name: altinity
+        namespace: flux-system
+      interval: 12h

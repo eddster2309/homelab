@@ -1,0 +1,53 @@
+# VictoriaMetrics scrapes for the pipeline. ClickHouse is scraped through the
+# clickhouse-operator's metrics-exporter (ServiceMonitor in that chart);
+# intel-update pushes its own results (enrich/intel-update.yaml).
+#
+# Strimzi: broker JMX metrics and the Kafka Exporter (consumer lag) both serve
+# :9404 as tcp-prometheus; the entity operator has no such port and is skipped.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMPodScrape
+metadata:
+  name: netflow-kafka
+spec:
+  selector:
+    matchLabels:
+      strimzi.io/cluster: netflow
+  podMetricsEndpoints:
+    - port: tcp-prometheus
+      path: /metrics
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMPodScrape
+metadata:
+  name: goflow2
+spec:
+  selector:
+    matchLabels:
+      app: goflow2
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMPodScrape
+metadata:
+  name: dns-tail
+spec:
+  selector:
+    matchLabels:
+      app: dns-tail
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMPodScrape
+metadata:
+  name: eve-receiver
+spec:
+  selector:
+    matchLabels:
+      app: eve-receiver
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics

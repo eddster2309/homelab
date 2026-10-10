@@ -1,0 +1,41 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: renovate-operator
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  path: ./kubernetes/overlays/infrastructure/infra/applications/renovate-operator
+  dependsOn:
+    - name: repositories-infra
+    - name: external-secrets-config
+    - name: authelia
+  healthChecks:
+    - kind: HelmRelease
+      name: renovate-operator
+      namespace: renovate-operator
+      apiVersion: helm.toolkit.fluxcd.io/v2beta1
+  # Never prune: dropping this Kustomization would take the RenovateJob CRDs
+  # with it. Matches the other operators.
+  prune: false
+  sourceRef:
+    kind: "GitRepository"
+    name: "flux-system"
+---
+# Split out so the RenovateJob is only applied once the chart has installed
+# its CRDs.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: renovate-operator-config
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  path: ./kubernetes/overlays/infrastructure/infra/config/renovate-operator
+  dependsOn:
+    - name: renovate-operator
+    - name: external-secrets-config
+  prune: true
+  sourceRef:
+    kind: "GitRepository"
+    name: "flux-system"

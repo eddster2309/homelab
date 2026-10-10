@@ -1,0 +1,40 @@
+# Static NFS share backing the versitygw posix backend -- deliberately NOT
+# csi-driver-nfs, so the export is a plain directory tree on the NAS that can be
+# read and written outside of Kubernetes as well.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: versitygw-nfs-data
+spec:
+  capacity:
+    storage: 500Gi  # ignored by NFS, but required by the API
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  mountOptions:
+    # 4.2 is required: the posix backend stores S3 metadata in user xattrs, and
+    # NFS only carries those from v4.2 (RFC 8276). On 4.1 versitygw exits with
+    # "xattrs are not supported on this filesystem".
+    - nfsvers=4.2
+    - hard
+    - noatime
+  nfs:
+    server: REDACTED_IP
+    path: /mnt/fastboi/k8s/s3
+  claimRef:
+    name: versitygw-nfs-data
+    namespace: versitygw
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: versitygw-nfs-data
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  volumeName: versitygw-nfs-data
+  resources:
+    requests:
+      storage: 500Gi

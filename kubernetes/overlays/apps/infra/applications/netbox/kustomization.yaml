@@ -1,0 +1,65 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: netbox
+resources:
+- ../../../../../bases/netbox
+- ./database
+- ./oidc-secret.yaml
+- ./secrets/api-token-peppers.yaml
+- ./superuser-secret.yaml
+- ./sso-pipeline-configmap.yaml
+- ./smtp-secret.yaml
+- ./sync-deploy/rbac.yaml
+- ./sync-deploy/secret.yaml
+- ./sync-deploy/cronjob.yaml
+configMapGenerator:
+# netbox-sync code; the hash suffix rolls the CronJob's pod template on any change
+- name: netbox-sync-code
+  files:
+  - sync/main.py
+  - sync/model.py
+  - sync/nb_models.py
+  - sync/nb_write.py
+  - sync/merge.py
+  - sync/netbox_api.py
+  - sync/bootstrap.py
+  - sync/reconcile.py
+  - sync/reconcile_common.py
+  - sync/reconcile_dns.py
+  - sync/reconcile_links.py
+  - sync/export.py
+  - sync/source_opnsense.py
+  - sync/source_proxmox.py
+  - sync/source_kubernetes.py
+  - sync/source_ipa.py
+  - sync/source_omada.py
+  - sync/source_flows.py
+  - sync/source_metrics.py
+  - sync/source_wazuh.py
+  - sync/source_frigate.py
+  - sync/source_bmc.py
+  - sync/source_homeassistant.py
+  - sync/source_binarylane.py
+components:
+- ../../../../../components/cnpg-barman-backup
+# ipa-ca ConfigMap: netbox-sync verifies FreeIPA's TLS with it
+- ../../../../../components/ca-certs
+patches:
+- target:
+    kind: HelmRelease
+    name: netbox
+  path: netbox-patch.yaml
+- target:
+    kind: ScheduledBackup
+    name: cnpg-nightly-backup
+  patch: |
+    - op: replace
+      path: /spec/cluster/name
+      value: netbox-db
+- target:
+    kind: RoleBinding
+    name: cnpg-backup-s3-reader
+  patch: |
+    - op: replace
+      path: /subjects/0/name
+      value: netbox-db

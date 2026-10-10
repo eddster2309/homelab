@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasource-configmap-asher-metrics
+  labels:
+     grafana_datasource: "1"
+data:
+  asher-metrics.yaml: |-
+    apiVersion: 1
+    datasources:
+      - name: VictoriaMetrics - Asher
+        type: prometheus
+        access: proxy
+        # accountID 1. The homelab datasource on /select/0/ is created by the
+        # victoria-metrics-k8s-stack chart itself.
+        url: http://vmselect-vicmetrics-victoria-metrics-k8s-stack.monitoring.svc.cluster.local:8481/select/1/prometheus
+        isDefault: false

@@ -1,0 +1,131 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: matomo
+spec:
+  values:
+    controllers:
+      matomo:
+        containers:
+          app:
+            env:
+              # These are read by the entrypoint and pre-fill the installer's
+              # database step; Matomo persists them to config/config.ini.php on
+              # the PVC once the install wizard has been completed.
+              MATOMO_DATABASE_ADAPTER: 'PDO\MYSQL'
+              MATOMO_DATABASE_HOST: matomo-db.matomo.svc.cluster.local
+              MATOMO_DATABASE_DBNAME: matomo
+              MATOMO_DATABASE_USERNAME: matomo
+              MATOMO_DATABASE_TABLES_PREFIX: matomo_
+              MATOMO_DATABASE_PASSWORD:
+                valueFrom:
+                  secretKeyRef:
+                    name: matomo-db-credentials
+                    key: password
+              # Archiving on a browser request is memory hungry; the image
+              # defaults to 128M.
+              PHP_MEMORY_LIMIT: 512M
+              # Matomo has no OIDC support of its own; RebelOIDC provides it.
+              # Bump to upgrade -- the stamp file makes the install re-run.
+              REBELOIDC_VERSION: "5.1.6"
+            # The image entrypoint unpacks Matomo onto the empty PVC and then
+            # runs `chown -R` over the whole webroot. A ConfigMap mounted inside
+            # /var/www/html is read-only, so that chown fails and, under `set -e`,
+            # kills the first container start. So the file is mounted outside the
+            # webroot and copied in here instead -- the entrypoint execs this
+            # after the unpack and chown are done.
+            args:
+              - sh
+              - -c
+              - |
+                install -m 0644 /matomo-config/common.config.ini.php \
+                  /var/www/html/config/common.config.ini.php
+
+                # RebelOIDC publishes no release artefact and isn't in the image,
+                # so fetch the pinned tag onto the PVC. The stamp file makes a
+                # restart a no-op, and a failed download leaves Matomo booting
+                # normally rather than crash-looping -- it just has no OIDC.
+                # Staged in the same directory as the target so the swap is a
+                # rename, not a cross-filesystem copy.
+                PLUGIN_DIR=/var/www/html/plugins/RebelOIDC
+                STAGE=/var/www/html/plugins/.rebeloidc-stage
+                if [ ! -f "$PLUGIN_DIR/.installed-$REBELOIDC_VERSION" ]; then
+                  echo "RebelOIDC: installing $REBELOIDC_VERSION"
+                  rm -rf "$STAGE" && mkdir -p "$STAGE"
+                  if curl -fsSL "https://github.com/Digitalist-Open-Cloud/Matomo-Plugin-RebelOIDC/archive/refs/tags/$REBELOIDC_VERSION.tar.gz" \
+                       | tar xz -C "$STAGE" --strip-components=1; then
+                    rm -rf "$PLUGIN_DIR"
+                    mv "$STAGE" "$PLUGIN_DIR"
+                    touch "$PLUGIN_DIR/.installed-$REBELOIDC_VERSION"
+                    chown -R www-data:www-data "$PLUGIN_DIR"
+                  else
+                    echo "RebelOIDC: download failed, starting without it" >&2
+                    rm -rf "$STAGE"
+                  fi
+                fi
+
+                # Idempotent once activated. Run as www-data so console never
+                # leaves root-owned files in Matomo's tmp/ cache, which would
+                # then be unwritable by Apache.
+                if [ -d "$PLUGIN_DIR" ]; then
+                  su -s /bin/sh -c "php /var/www/html/console plugin:activate RebelOIDC" www-data \
+                    || echo "RebelOIDC: activation deferred" >&2
+                fi
+
+                exec apache2-foreground
+
+    configMaps:
+      config:
+        data:
+          # Matomo merges global.ini.php -> common.config.ini.php ->
+          # config.ini.php, so settings here survive the installer and every
+          # upgrade, unlike anything written into config.ini.php.
+          common.config.ini.php: |
+            [General]
+            ; Traefik terminates TLS, so PHP only ever sees plain HTTP on :80.
+            ; Without these Matomo builds http:// URLs and records the ingress
+            ; controller's pod IP as every visitor's IP.
+            assume_secure_protocol = 1
+            force_ssl = 1
+            proxy_client_headers[] = HTTP_X_FORWARDED_FOR
+            proxy_host_headers[] = HTTP_X_FORWARDED_HOST
+            trusted_hosts[] = "matomo.0b.au"
+
+    persistence:
+      data:
+        enabled: true
+        storageClass: longhorn
+        accessMode: ReadWriteOnce
+        size: 10Gi
+        retain: true
+        globalMounts:
+          - path: /var/www/html
+      config:
+        type: configMap
+        identifier: config
+        # Staged outside the webroot; the container args copy it into
+        # /var/www/html/config once the entrypoint has finished unpacking.
+        globalMounts:
+          - path: /matomo-config
+            readOnly: true
+
+    defaultPodOptions:
+      annotations:
+        reloader.stakater.com/auto: "true"
+
+    ingress:
+      app:
+        enabled: true
+        className: traefik
+        annotations:
+          # Authelia forward-auth in front of the dashboard. The tracker
+          # endpoints are bypassed in Authelia's ACL so browsers on tracked
+          # sites can still collect -- see config.acl.yaml.
+          traefik.ingress.kubernetes.io/router.middlewares: traefik-authelia@kubernetescrd
+        hosts:
+          - host: matomo.0b.au
+            paths:
+              - path: /
+                service:
+                  identifier: app
+                  port: http

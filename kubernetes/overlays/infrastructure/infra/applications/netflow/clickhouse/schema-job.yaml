@@ -1,0 +1,39 @@
+# Applies clickhouse/schema/*.sql in order. Every statement is idempotent;
+# the ConfigMap's hash suffix changes this spec on any SQL edit and the force
+# annotation lets Flux replace the (immutable) Job. Column changes to existing
+# tables are not handled here — run the ALTER by hand, then update the SQL.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: clickhouse-schema
+  annotations:
+    kustomize.toolkit.fluxcd.io/force: enabled
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: schema
+          image: clickhouse/clickhouse-server:26.9
+          command: [sh, -ec]
+          args:
+            - |
+              for f in /schema/*.sql; do
+                echo "applying $f"
+                clickhouse-client --host clickhouse-netflow --user admin \
+                  --password "$ADMIN_PASSWORD" --queries-file "$f"
+              done
+          env:
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: clickhouse-credentials
+                  key: admin_password
+          volumeMounts:
+            - name: schema
+              mountPath: /schema
+      volumes:
+        - name: schema
+          configMap:
+            name: clickhouse-schema

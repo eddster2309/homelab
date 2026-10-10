@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nfs-data-pvc
+spec:
+  storageClassName: nfs
+  # The live claim was recreated bound to this volume with Flux owning the
+  # field; a bound claim's volumeName is immutable, so it has to be declared.
+  volumeName: pvc-d8895a80-529f-48e5-a312-00c47087b175
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 300Gi

@@ -1,0 +1,90 @@
+# eve-receiver: Suricata EVE lines from OPNsense -> Kafka topic 'eve' -> ClickHouse (05-eve.sql).
+#
+# OPNsense's syslog-ng tails /var/log/suricata/eve.json and sends each line as-is
+# (no syslog header) over TCP, so this is a plain newline-delimited JSON socket.
+# Only tls, http and alert events are kept, flattened to the columns of
+# netflow.eve_queue; everything else (anomaly, drop, ssh, stats) is dropped here.
+data_dir: /var/lib/vector
+
+sources:
+  eve_in:
+    type: socket
+    mode: tcp
+    address: REDACTED_IP:5514
+    framing:
+      method: newline_delimited
+      newline_delimited:
+        max_length: 262144
+    decoding:
+      codec: json
+  vector_metrics:
+    type: internal_metrics
+
+transforms:
+  eve:
+    type: remap
+    inputs: [eve_in]
+    drop_on_abort: true
+    drop_on_error: true
+    source: |
+      t = string(.event_type) ?? ""
+      if !includes(["tls", "http", "alert"], t) { abort }
+      ts = parse_timestamp(string(.timestamp) ?? "", "%Y-%m-%dT%H:%M:%S%.f%z") ?? now()
+      out = {
+        "ts_ms": to_unix_timestamp(ts, unit: "milliseconds"),
+        "event_type": t,
+        "in_iface": .in_iface,
+        "src_ip": .src_ip,
+        "src_port": .src_port,
+        "dest_ip": .dest_ip,
+        "dest_port": .dest_port,
+        "proto": .proto,
+        "app_proto": .app_proto
+      }
+      if t == "tls" {
+        out.sni = downcase(string(.tls.sni) ?? "")
+        out.version = .tls.version
+        out.ja4 = .tls.ja4
+        out.ja3 = .tls.ja3.hash
+        out.subject = .tls.subject
+        out.issuer = .tls.issuerdn
+        out.not_after = .tls.notafter
+      } else if t == "http" {
+        # Host header without any :port
+        out.http_host = downcase(replace(string(.http.hostname) ?? "", r':\d+$', ""))
+        out.http_url = .http.url
+        out.http_method = .http.http_method
+        out.http_user_agent = .http.http_user_agent
+        out.http_status = .http.status
+      } else {
+        out.alert_sid = .alert.signature_id
+        out.alert_signature = .alert.signature
+        out.alert_category = .alert.category
+        out.alert_severity = .alert.severity
+        out.alert_action = .alert.action
+      }
+      . = compact(out)
+
+  # Traffic between two monitored VLANs is seen once per interface, so each event
+  # arrives twice. Drop the second copy (same event for the same connection).
+  dedupe:
+    type: dedupe
+    inputs: [eve]
+    fields:
+      match: [event_type, src_ip, src_port, dest_ip, dest_port, proto, sni, http_url, alert_sid]
+    cache:
+      num_events: 20000
+
+sinks:
+  kafka:
+    type: kafka
+    inputs: [dedupe]
+    bootstrap_servers: netflow-kafka-bootstrap:9092
+    topic: eve
+    compression: zstd
+    encoding:
+      codec: json
+  prometheus:
+    type: prometheus_exporter
+    inputs: [vector_metrics]
+    address: REDACTED_IP:9598

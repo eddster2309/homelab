@@ -1,0 +1,21 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kafka-ui
+spec:
+  interval: 30m
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      retries: -1
+  chart:
+    spec:
+      chart: kafka-ui
+      version: "*"
+      sourceRef:
+        kind: HelmRepository
+        name: kafbat
+        namespace: flux-system
+      interval: 12h

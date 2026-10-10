@@ -1,0 +1,148 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: gitlab-runner-fleeting
+spec:
+  values:
+    # A GitLab Runner with the Proxmox fleeting plugin baked in at
+    # /usr/local/bin/fleeting-plugin-proxmox, built from
+    # jack/fleeting-plugin-proxmox. Pinned to a commit rather than :latest so a
+    # rebuild of the plugin does not roll out unreviewed — bump this tag to
+    # deploy a new build. The Harbor `gitlab` project is public, so no pull
+    # secret is needed.
+    image:
+      registry: harbor.0b.au
+      image: gitlab/jack/fleeting-plugin-proxmox/gitlab-runner
+      tag: 9e04d3f6
+
+    gitlabUrl: https://git.0b.au
+
+    # The chart defaults to runAsUser 100 / fsGroup 65533, which suit the
+    # Alpine image it normally deploys. This image is built FROM
+    # gitlab/gitlab-runner, the Ubuntu-based one, where the gitlab-runner user
+    # and /home/gitlab-runner are uid/gid 999 — as uid 100 the entrypoint
+    # cannot create its working directory and the container exits immediately.
+    podSecurityContext:
+      runAsUser: 999
+      fsGroup: 999
+
+    # max_instances (3) x capacity_per_instance (1). Raising this without
+    # raising the autoscaler limits below just queues jobs on the manager.
+    concurrent: 3
+
+    # Never run two managers at once. The plugin treats any VM in the pool it
+    # does not know about as abandoned and destroys it, so during a rolling
+    # update the outgoing and incoming pods delete each other's instances and
+    # the pool thrashes. Recreate makes the old pod go away first.
+    strategy:
+      type: Recreate
+
+    # The plugin holds each instance's generated SSH key only in memory, so a
+    # restart orphans every running VM. Draining rather than killing keeps that
+    # to a minimum. Well under the chart's 1h default, because with Recreate
+    # this is downtime: no new manager starts until the old one is gone, and a
+    # wedged job would otherwise hold the rollout for the full hour.
+    terminationGracePeriodSeconds: 600
+
+    # A `glrt-` authentication token created against runner id 2111. The chart
+    # reads it from /secrets/runner-token in this secret.
+    runners:
+      secret: gitlab-runner-fleeting-token
+      name: proxmox-fleeting
+      executor: docker-autoscaler
+      # Projected at /secrets; the chart entrypoint turns accesskey/secretkey
+      # into CACHE_S3_ACCESS_KEY/CACHE_S3_SECRET_KEY for the cache below.
+      cache:
+        secretName: gitlab-runner-fleeting-cache
+      config: |
+        [[runners]]
+          environment = ["HARBOR_HOST=harbor.0b.au"]
+
+          # Jobs run in Docker on the cloned VM, so `image:` in .gitlab-ci.yml
+          # works as it does on the in-cluster runner. Template 2004 ships
+          # Docker Engine and adds the cloud-init user to the `docker` group at
+          # boot, before logins are allowed, which is what makes the socket
+          # reachable over SSH.
+          [runners.docker]
+            image = "harbor.0b.au/dockerio/library/debian:bookworm-slim"
+            privileged = false
+
+          # Distributed cache on versitygw, same bucket as the in-cluster
+          # runner. Path keeps this runner's objects distinct from theirs;
+          # Shared means cache keys must stay distinct across projects.
+          [runners.cache]
+            Type = "s3"
+            Path = "fleeting"
+            Shared = true
+            [runners.cache.s3]
+              ServerAddress = "s3.0b.au"
+              BucketName = "rke-gitlab-runner-cache"
+              BucketLocation = "us-east-1"
+              Insecure = false
+
+          [runners.autoscaler]
+            plugin = "/usr/local/bin/fleeting-plugin-proxmox"
+            # One job per VM, and a VM is reused for up to 10 jobs before being
+            # replaced. Jobs are containerised, so reuse is safe; the cap just
+            # bounds drift on a long-lived instance.
+            capacity_per_instance = 1
+            max_use_count = 10
+            max_instances = 3
+
+            [runners.autoscaler.plugin_config]
+              url = "https://REDACTED_IP:8006"
+              # Proxmox serves its own CA ("PVE Cluster Manager CA"), which is
+              # not the IPA CA the ca-certs component installs, so the chain
+              # cannot be verified from in-cluster.
+              insecure_skip_tls_verify = true
+              pool = "fleeting"
+              # `storage` is deliberately unset: omitting it gives a linked
+              # clone off template 2004's base disks, which is far faster and
+              # cheaper than a full clone onto local-zfs.
+              template_id = 2004
+              max_instances = 3
+              instance_network_interface = "eth0"
+              # The plugin generates a throwaway ed25519 key per instance and
+              # provisions this user through cloud-init, so no credentials are
+              # baked into the template and connector_config carries none.
+              cloud_init_username = "fleeting"
+              # Template 2004 is already current; upgrading on every first boot
+              # would add minutes to each clone.
+              cloud_init_package_upgrade = false
+
+            [runners.autoscaler.connector_config]
+              os = "linux"
+              arch = "amd64"
+              protocol = "ssh"
+
+            [[runners.autoscaler.policy]]
+              # Keep one VM warm so back-to-back pipelines skip the clone and
+              # boot; after 20m idle it is destroyed.
+              idle_count = 1
+              idle_time = "20m"
+              # Explicit only to satisfy the runner's config schema, which
+              # rejects a null here and logs a validation warning on every
+              # config load. False is the default behaviour.
+              preemptive_mode = false
+
+    # The plugin inherits the manager's environment, which is how it gets its
+    # Proxmox credentials without a credentials file on disk.
+    extraEnvFrom:
+      PROXMOX_TOKEN_ID:
+        secretKeyRef:
+          name: gitlab-runner-fleeting-proxmox
+          key: token_id
+      PROXMOX_SECRET:
+        secretKeyRef:
+          name: gitlab-runner-fleeting-proxmox
+          key: secret
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 512Mi
+
+    podAnnotations:
+      reloader.stakater.com/auto: "true"

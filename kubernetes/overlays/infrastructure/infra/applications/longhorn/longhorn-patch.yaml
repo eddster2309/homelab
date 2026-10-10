@@ -1,0 +1,41 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: longhorn
+  namespace: longhorn
+spec:
+  # A Longhorn upgrade rolls the manager DaemonSet, CSI and instance managers
+  # and routinely outlasts Helm's 5m default. Longhorn can never be rolled
+  # back: once a newer manager has run, older managers refuse to start
+  # ("downgrading ... is not supported"). So: long timeout, and no rollback
+  # remediation — a failed upgrade stays failed for a human to look at.
+  timeout: 30m
+  upgrade:
+    remediation:
+      retries: 0
+      remediateLastFailure: false
+  chart:
+    spec:
+      chart: longhorn
+      version: "1.13.0"
+      sourceRef:
+        kind: HelmRepository
+        name: longhorn
+        namespace: flux-system
+  values:
+    defaultSettings:
+      guaranteedInstanceManagerCpu: 6
+    defaultBackupStore:
+      # versitygw. The region has to match VGW_REGION, and the bucket is owned
+      # by a dedicated versitygw IAM user rather than the gateway root account.
+      backupTarget: s3://longhorn-backup@us-east-1/
+      backupTargetCredentialSecret: s3-secret
+    ingress:
+      enabled: true
+      host: longhorn.0b.au
+      ingressClassName: traefik
+      annotations:
+        traefik.ingress.kubernetes.io/router.middlewares: traefik-authelia@kubernetescrd
+    metrics:
+      serviceMonitor:
+        enabled: true

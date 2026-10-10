@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sso-pipeline-roles
+data:
+  sso_pipeline_roles.py: |
+    from django.conf import settings
+    from netbox.authentication import Group
+
+    def set_role(response, user, backend, *args, **kwargs):
+        staff_role = getattr(settings, 'SOCIAL_AUTH_STAFF_ROLE', 'staff')
+        superuser_role = getattr(settings, 'SOCIAL_AUTH_SUPERUSER_ROLE', 'superuser')
+
+        groups = response.get('groups', [])
+
+        user.is_staff = (staff_role in groups)
+        user.is_superuser = (superuser_role in groups)
+        user.save()
+
+        nb_groups = Group.objects.all()
+        for group in nb_groups:
+            try:
+                if group.name in groups:
+                    group.users.add(user)
+                else:
+                    group.users.remove(user)
+            except Group.DoesNotExist:
+                continue

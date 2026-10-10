@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+- object-store.yaml
+- s3-secret.yaml
+- scheduled-backup.yaml
+- rbac.yaml
+patches:
+- target:
+    group: postgresql.cnpg.io
+    kind: Cluster
+  patch: |
+    - op: add
+      path: /spec/plugins
+      value:
+        - name: barman-cloud.cloudnative-pg.io
+          isWALArchiver: true
+          parameters:
+            barmanObjectName: garage-s3-store

@@ -1,0 +1,82 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kafka-ui
+spec:
+  values:
+    # Kafbat UI for the netflow Kafka (Strimzi). Authelia forward-auth is the
+    # outer gate, same as flux.0b.au; the UI then does its own OIDC login and
+    # maps the groups claim to RBAC roles.
+    yamlApplicationConfig:
+      kafka:
+        clusters:
+          - name: netflow
+            bootstrapServers: netflow-kafka-bootstrap.netflow.svc:9092
+            # The topic is ClickHouse's only buffer: browse, but no deletes,
+            # offset resets or produces. Drop this to make changes.
+            readOnly: true
+            # Strimzi's JMX exporter on each broker (kafka/metrics.yaml)
+            metrics:
+              type: PROMETHEUS
+              port: 9404
+      auth:
+        type: OAUTH2
+        oauth2:
+          client:
+            authelia:
+              provider: authelia
+              client-name: Authelia
+              clientId: kafka-ui
+              # clientSecret: AUTH_OAUTH2_CLIENT_AUTHELIA_CLIENTSECRET below
+              scope: [openid, profile, email, groups]
+              issuer-uri: https://auth.0b.au
+              # Pinned: behind Traefik the app would otherwise build an http:// URI
+              redirect-uri: https://kafka-ui.0b.au/login/oauth2/code/authelia
+              authorization-grant-type: authorization_code
+              user-name-attribute: preferred_username
+              custom-params:
+                type: oauth
+                roles-field: groups
+                logoutUrl: https://auth.0b.au/logout
+      rbac:
+        roles:
+          - name: admins
+            clusters: [netflow]
+            subjects:
+              - provider: oauth
+                type: role
+                value: k8s-infra-admins
+            permissions:
+              - resource: applicationconfig
+                actions: all
+              - resource: clusterconfig
+                actions: all
+              - resource: topic
+                value: ".*"
+                actions: all
+              - resource: consumer
+                value: ".*"
+                actions: all
+              - resource: acl
+                actions: all
+    env:
+      - name: AUTH_OAUTH2_CLIENT_AUTHELIA_CLIENTSECRET
+        valueFrom:
+          secretKeyRef:
+            name: kafka-ui-oidc
+            key: client-secret
+    resources:
+      requests:
+        cpu: 50m
+        memory: 384Mi
+      limits:
+        memory: 768Mi
+    # TLS comes from the traefik TLSStore wildcard.
+    ingress:
+      enabled: true
+      ingressClassName: traefik
+      host: kafka-ui.0b.au
+      annotations:
+        traefik.ingress.kubernetes.io/router.middlewares: traefik-authelia@kubernetescrd
+    podAnnotations:
+      reloader.stakater.com/auto: "true"

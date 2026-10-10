@@ -1,0 +1,14 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: strimzi
+spec:
+  # CRDs ship in the chart's crds/ dir, which Helm never upgrades by default
+  install:
+    crds: CreateReplace
+  upgrade:
+    crds: CreateReplace
+  values:
+    # Not watchNamespaces: that creates RoleBindings inside each watched
+    # namespace, which doesn't exist yet (netflow depends on this release).
+    watchAnyNamespace: true

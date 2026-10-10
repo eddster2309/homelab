@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: goflow2
+  labels:
+    app: goflow2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: goflow2
+  template:
+    metadata:
+      labels:
+        app: goflow2
+      annotations:
+        reloader.stakater.com/auto: "true"
+    spec:
+      containers:
+        - name: goflow2
+          image: ghcr.io/netsampler/goflow2:v2.2.7
+          args:
+            - -listen=netflow://:2055
+            - -format=json
+            - -transport=kafka
+            - -transport.kafka.brokers=netflow-kafka-bootstrap:9092
+            - -transport.kafka.topic=flows
+            # JSON compresses ~10x; the ClickHouse Kafka engine reads zstd natively
+            - -transport.kafka.compression=zstd
+          ports:
+            - name: netflow
+              containerPort: 2055
+              protocol: UDP
+            # Prometheus metrics (-addr default :8080)
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
