@@ -1,0 +1,4 @@
+namespace: external-secrets
+resources:
+  - storageclass-nfs.yaml
+  - storageclass-nfs-no-backup.yaml

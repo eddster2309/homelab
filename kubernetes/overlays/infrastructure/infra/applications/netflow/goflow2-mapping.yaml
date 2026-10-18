@@ -1,0 +1,42 @@
+# goflow2 -mapping file. OPNsense's ng_netflow v9 template sends IN_PKTS, IN_BYTES,
+# OUT_PKTS, OUT_BYTES, with OUT_* always 0 (sys/netgraph/netflow/netflow_v9.c).
+# goflow2 decodes IN_* and OUT_* into the same bytes/packets, so the zero wins
+# (producer/proto/producer_nf.go, unfixed as of v2.2.7). Custom mappings can't stop
+# that, but they can also copy fields 1 and 2 into in_bytes/in_packets, which
+# flows_mv reads as greatest(bytes, in_bytes).
+#
+# Setting formatter.fields limits the JSON to this list: keep it in step with the
+# flows_queue columns in clickhouse/schema/03-flows.sql.
+formatter:
+  fields:
+    - type
+    - time_received_ns
+    - time_flow_start_ns
+    - time_flow_end_ns
+    - sampler_address
+    - sampling_rate
+    - bytes
+    - packets
+    - src_addr
+    - dst_addr
+    - proto
+    - src_port
+    - dst_port
+    - in_if
+    - out_if
+    - tcp_flags
+    - in_bytes
+    - in_packets
+  protobuf:
+    - name: in_bytes
+      index: 1001
+      type: varint
+    - name: in_packets
+      index: 1002
+      type: varint
+netflowv9:
+  mapping:
+    - field: 1 # IN_BYTES
+      destination: in_bytes
+    - field: 2 # IN_PKTS
+      destination: in_packets

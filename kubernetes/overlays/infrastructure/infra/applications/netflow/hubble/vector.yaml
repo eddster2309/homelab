@@ -1,0 +1,177 @@
+# hubble-shipper: Cilium's Hubble egress log on each node -> Kafka topic 'hubble' -> ClickHouse
+# (02-workloads.sql). The log is written by the agents' dynamic exporter (cilium-helmchart-config.yaml,
+# exporter "egress"): pod connections to anything outside the cluster, before masquerade.
+#
+# One line per new connection is kept (the first event of each 5-tuple); Hubble emits a few per
+# connection (SYN, then flag changes). Drops are kept separately: they never leave the node, so
+# NetFlow has no record of them.
+#
+# A second log, pods.log (exporter "pods"), holds Traefik's packets to its backends. They name
+# the destination pod, which is how a backend ip:port in Traefik's access log becomes a workload
+# (k8s_pods, 02-workloads.sql). One line per pod per hour is kept; Kafka topic hubble-pods.
+data_dir: /var/lib/vector
+
+sources:
+  hubble_in:
+    type: file
+    include: [/var/run/cilium/hubble/egress.log]
+    read_from: end
+    # Rotated files (egress-<ts>.log) are left alone: lines there were read before rotation.
+    fingerprint:
+      strategy: device_and_inode
+  pods_in:
+    type: file
+    include: [/var/run/cilium/hubble/pods.log]
+    read_from: end
+    fingerprint:
+      strategy: device_and_inode
+  vector_metrics:
+    type: internal_metrics
+
+transforms:
+  hubble:
+    type: remap
+    inputs: [hubble_in]
+    drop_on_abort: true
+    drop_on_error: true
+    source: |
+      e = parse_json!(string!(.message))
+      f = object(e.flow) ?? {}
+      if f.is_reply == true { abort }
+      l4 = object(f.l4) ?? {}
+      proto = ""
+      t = {}
+      if exists(l4.TCP) {
+        proto = "TCP"
+        t = object(l4.TCP) ?? {}
+      } else if exists(l4.UDP) {
+        proto = "UDP"
+        t = object(l4.UDP) ?? {}
+      } else {
+        abort
+      }
+      src = string(f.IP.source) ?? ""
+      dst = string(f.IP.destination) ?? ""
+      if src == "" || dst == "" { abort }
+      sp = to_int(t.source_port || t.sourcePort) ?? 0
+      dp = to_int(t.destination_port || t.destinationPort) ?? 0
+      if sp == 0 || dp == 0 { abort }
+
+      s = object(f.source) ?? {}
+      ns = string(s.namespace) ?? ""
+      pod = string(s.pod_name || s.podName) ?? ""
+      if ns == "" || pod == "" { abort }
+      wl = array(s.workloads) ?? []
+      workload = ""
+      kind = ""
+      if length(wl) > 0 {
+        workload = string(wl[0].name) ?? ""
+        kind = string(wl[0].kind) ?? ""
+      }
+      # A bare pod (no owner) is its own workload
+      if workload == "" {
+        workload = pod
+        kind = "Pod"
+      }
+
+      ts = parse_timestamp(string(f.time || e.time) ?? "", "%+") ?? now()
+      node = string(f.node_name || e.node_name) ?? ""
+      . = {
+        "ts_ms": to_unix_timestamp(ts, unit: "milliseconds"),
+        # This shipper's node is the one that wrote the line (the DaemonSet reads its own
+        # node's file), and its InternalIP is what masquerade rewrites the source to.
+        "node": string(split(node, ".")[0]) ?? node,
+        "node_ip": get_env_var("NODE_IP") ?? "",
+        "pod_ip": src,
+        "src_port": sp,
+        "dst": dst,
+        "dst_port": dp,
+        "proto": proto,
+        "namespace": ns,
+        "pod": pod,
+        "workload": workload,
+        "workload_kind": kind,
+        "verdict": string(f.verdict) ?? "",
+        "drop_reason": string(f.drop_reason_desc || f.dropReasonDesc) ?? ""
+      }
+
+  # First event per connection. Verdict is in the key so a drop after a forwarded packet
+  # (a policy change mid-connection) still comes through.
+  dedupe:
+    type: dedupe
+    inputs: [hubble]
+    fields:
+      match: [pod_ip, src_port, dst, dst_port, proto, verdict]
+    cache:
+      num_events: 20000
+
+  # The destination pod of Traefik's packets. Events whose destination isn't a pod (no
+  # namespace or name) are dropped.
+  pods:
+    type: remap
+    inputs: [pods_in]
+    drop_on_abort: true
+    drop_on_error: true
+    source: |
+      e = parse_json!(string!(.message))
+      f = object(e.flow) ?? {}
+      ip = string(f.IP.destination) ?? ""
+      d = object(f.destination) ?? {}
+      ns = string(d.namespace) ?? ""
+      pod = string(d.pod_name || d.podName) ?? ""
+      if ip == "" || ns == "" || pod == "" { abort }
+      wl = array(d.workloads) ?? []
+      workload = ""
+      kind = ""
+      if length(wl) > 0 {
+        workload = string(wl[0].name) ?? ""
+        kind = string(wl[0].kind) ?? ""
+      }
+      # A bare pod (no owner) is its own workload
+      if workload == "" {
+        workload = pod
+        kind = "Pod"
+      }
+
+      ts = parse_timestamp(string(f.time || e.time) ?? "", "%+") ?? now()
+      node = string(f.node_name || e.node_name) ?? ""
+      . = {
+        "ts_ms": to_unix_timestamp(ts, unit: "milliseconds"),
+        "node": string(split(node, ".")[0]) ?? node,
+        "pod_ip": ip,
+        "namespace": ns,
+        "pod": pod,
+        "workload": workload,
+        "workload_kind": kind
+      }
+
+  # One line per pod per hour, not once ever: k8s_pod_dict only looks at the last day, so a
+  # long-lived pod has to be seen again. A reused IP is a different pod, hence the pod in the key.
+  pods_throttle:
+    type: throttle
+    inputs: [pods]
+    key_field: "{{ pod_ip }}/{{ pod }}"
+    threshold: 1
+    window_secs: 3600
+
+sinks:
+  kafka_pods:
+    type: kafka
+    inputs: [pods_throttle]
+    bootstrap_servers: netflow-kafka-bootstrap.netflow.svc:9092
+    topic: hubble-pods
+    compression: zstd
+    encoding:
+      codec: json
+  kafka:
+    type: kafka
+    inputs: [dedupe]
+    bootstrap_servers: netflow-kafka-bootstrap.netflow.svc:9092
+    topic: hubble
+    compression: zstd
+    encoding:
+      codec: json
+  prometheus:
+    type: prometheus_exporter
+    inputs: [vector_metrics]
+    address: REDACTED_IP:9598

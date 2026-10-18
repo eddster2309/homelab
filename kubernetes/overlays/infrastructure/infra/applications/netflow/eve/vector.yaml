@@ -1,0 +1,190 @@
+# eve-receiver: Suricata EVE lines from OPNsense -> Kafka topic 'eve' -> ClickHouse (05-eve.sql).
+#
+# OPNsense's syslog-ng tails /var/log/suricata/eve.json and sends each line as-is
+# (no syslog header) over TCP, so this is a plain newline-delimited JSON socket.
+# Only tls, http and alert events are kept, flattened to the columns of
+# netflow.eve_queue; everything else (anomaly, drop, ssh, stats) is dropped here.
+#
+# Also receives pf's filterlog on :5515 (syslog) -> Kafka topic 'fwlog'; see 'fw' below.
+data_dir: /var/lib/vector
+
+sources:
+  eve_in:
+    type: socket
+    mode: tcp
+    address: REDACTED_IP:5514
+    framing:
+      method: newline_delimited
+      newline_delimited:
+        max_length: 262144
+    decoding:
+      codec: json
+  # pf's filterlog from OPNsense's remote syslog target (System → Settings → Logging →
+  # Remote: TCP, application "filter", RFC5424) -> Kafka topic 'fwlog' (06-fwlog.sql).
+  fw_in:
+    type: syslog
+    mode: tcp
+    address: REDACTED_IP:5515
+  vector_metrics:
+    type: internal_metrics
+
+transforms:
+  eve:
+    type: remap
+    inputs: [eve_in]
+    drop_on_abort: true
+    drop_on_error: true
+    source: |
+      t = string(.event_type) ?? ""
+      if !includes(["tls", "http", "alert"], t) { abort }
+      ts = parse_timestamp(string(.timestamp) ?? "", "%Y-%m-%dT%H:%M:%S%.f%z") ?? now()
+      out = {
+        "ts_ms": to_unix_timestamp(ts, unit: "milliseconds"),
+        "event_type": t,
+        "in_iface": .in_iface,
+        "src_ip": .src_ip,
+        "src_port": .src_port,
+        "dest_ip": .dest_ip,
+        "dest_port": .dest_port,
+        "proto": .proto,
+        "app_proto": .app_proto
+      }
+      if t == "tls" {
+        out.sni = downcase(string(.tls.sni) ?? "")
+        out.version = .tls.version
+        out.ja4 = .tls.ja4
+        out.ja3 = .tls.ja3.hash
+        out.subject = .tls.subject
+        out.issuer = .tls.issuerdn
+        out.not_after = .tls.notafter
+      } else if t == "http" {
+        # Host header without any :port
+        out.http_host = downcase(replace(string(.http.hostname) ?? "", r':\d+$', ""))
+        out.http_url = .http.url
+        out.http_method = .http.http_method
+        out.http_user_agent = .http.http_user_agent
+        out.http_status = .http.status
+      } else {
+        out.alert_sid = .alert.signature_id
+        out.alert_signature = .alert.signature
+        out.alert_category = .alert.category
+        out.alert_severity = .alert.severity
+        out.alert_action = .alert.action
+      }
+      . = compact(out)
+
+  # Traffic between two monitored VLANs is seen once per interface, so each event
+  # arrives twice. Drop the second copy (same event for the same connection).
+  dedupe:
+    type: dedupe
+    inputs: [eve]
+    fields:
+      match: [event_type, src_ip, src_port, dest_ip, dest_port, proto, sni, http_url, alert_sid]
+    cache:
+      num_events: 20000
+
+  # One filterlog line per packet pf logged. Only blocks/rejects are kept, and blocks
+  # inbound on the WAN (internet scans) are dropped: WAN_IFACES is the WAN device
+  # name(s) as filterlog prints them (Interfaces → Assignments), set in receiver.yaml.
+  # CSV layout (filterlog): 0 rule, 1 subrule, 2 anchor, 3 label, 4 iface, 5 reason,
+  # 6 action, 7 dir, 8 ipver, then
+  #   v4: 9 tos, 10 ecn, 11 ttl, 12 id, 13 offset, 14 flags, 15 protoid, 16 proto,
+  #       17 length, 18 src, 19 dst, 20 sport, 21 dport, 22 datalen, 23 tcpflags
+  #   v6: 9 class, 10 flowlabel, 11 hoplimit, 12 proto, 13 protoid, 14 length,
+  #       15 src, 16 dst, 17 sport, 18 dport, 19 datalen, 20 tcpflags
+  # Ports and TCP flags are only there for tcp/udp.
+  fw:
+    type: remap
+    inputs: [fw_in]
+    drop_on_abort: true
+    drop_on_error: true
+    source: |
+      if (string(.appname) ?? "") != "filterlog" { abort }
+      f = parse_csv(string(.message) ?? "") ?? []
+      action = string(f[6]) ?? ""
+      if !includes(["block", "reject"], action) { abort }
+      iface = string(f[4]) ?? ""
+      dir = string(f[7]) ?? ""
+      # Unset (or still TODO) WAN_IFACES is an error, so every event is dropped rather
+      # than letting internet scans in.
+      wan = get_env_var("WAN_IFACES") ?? ""
+      assert!(wan != "" && wan != "TODO", "WAN_IFACES is not set")
+      if dir == "in" && includes(split(wan, ","), iface) { abort }
+
+      ver = string(f[8]) ?? ""
+      proto = ""
+      length = ""
+      src = ""
+      dst = ""
+      sport = ""
+      dport = ""
+      flags = ""
+      if ver == "4" {
+        proto = string(f[16]) ?? ""
+        length = string(f[17]) ?? ""
+        src = string(f[18]) ?? ""
+        dst = string(f[19]) ?? ""
+        sport = string(f[20]) ?? ""
+        dport = string(f[21]) ?? ""
+        flags = string(f[23]) ?? ""
+      } else if ver == "6" {
+        proto = string(f[12]) ?? ""
+        length = string(f[14]) ?? ""
+        src = string(f[15]) ?? ""
+        dst = string(f[16]) ?? ""
+        sport = string(f[17]) ?? ""
+        dport = string(f[18]) ?? ""
+        flags = string(f[20]) ?? ""
+      } else {
+        abort
+      }
+      if src == "" || dst == "" { abort }
+      # Same spelling as goflow2's flows.proto (TCP, UDP, ICMP)
+      proto = upcase(proto)
+      sp = 0
+      dp = 0
+      if includes(["TCP", "UDP"], proto) {
+        sp = to_int(sport) ?? 0
+        dp = to_int(dport) ?? 0
+      }
+      if proto != "TCP" { flags = "" }
+
+      ts = timestamp(.timestamp) ?? parse_timestamp(string(.timestamp) ?? "", "%+") ?? now()
+      . = compact({
+        "ts_ms": to_unix_timestamp(ts, unit: "milliseconds"),
+        "iface": iface,
+        "dir": dir,
+        "action": action,
+        "reason": string(f[5]) ?? "",
+        "rule_nr": to_int(string(f[0]) ?? "") ?? 0,
+        "label": string(f[3]) ?? "",
+        "proto": proto,
+        "src_ip": src,
+        "src_port": sp,
+        "dst_ip": dst,
+        "dst_port": dp,
+        "tcp_flags": flags,
+        "length": to_int(length) ?? 0
+      })
+
+sinks:
+  kafka:
+    type: kafka
+    inputs: [dedupe]
+    bootstrap_servers: netflow-kafka-bootstrap:9092
+    topic: eve
+    compression: zstd
+    encoding:
+      codec: json
+  kafka_fw:
+    type: kafka
+    inputs: [fw]
+    bootstrap_servers: netflow-kafka-bootstrap:9092
+    topic: fwlog
+    compression: zstd
+    encoding:
+      codec: json
+  prometheus:
+    type: prometheus_exporter
+    inputs: [vector_metrics]
+    address: REDACTED_IP:9598

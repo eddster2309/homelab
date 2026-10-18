@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: rdpgw
+resources:
+- namespace.yaml
+- deployment.yaml
+- service.yaml
+- ingress.yaml
+- netpol.yaml
+configMapGenerator:
+# the hash suffix rolls the pod on any config change
+- name: rdpgw-config
+  files:
+  - rdpgw.yaml
+  - default.rdp

@@ -1,0 +1,87 @@
+# OPNsense + Proxmox + Kubernetes + FreeIPA DNS -> NetBox -> ClickHouse (netflow.nb_*).
+# Image: registry.git.0b.au/homelab/homelab-network-ui/netbox-sync (GitLab homelab/homelab-network-ui,
+# services/netbox-sync; tests there: uv run pytest). Tag is 1.0.<pipeline iid>, bumped by Renovate
+# with the netflowui group.
+#
+# Rollout: create the Vault credentials, unsuspend, read a dry-run's logs
+# (kubectl -n netbox logs job/<name>), then set SYNC_DRY_RUN to "false".
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: netbox-sync
+spec:
+  schedule: "*/5 * * * *"
+  # Forbid only covers Jobs the CronJob creates: a manual `kubectl create job --from`
+  # can race a scheduled run (the sync then removes the duplicate VIPs it finds).
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app: netbox-sync
+        spec:
+          serviceAccountName: netbox-sync
+          restartPolicy: Never
+          imagePullSecrets:
+            - name: netflowui-registry
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            runAsNonRoot: true
+          containers:
+            - name: sync
+              image: registry.git.0b.au/homelab/homelab-network-ui/netbox-sync:1.0.8
+              env:
+                # "true": log planned NetBox writes and skip the ClickHouse export
+                - name: SYNC_DRY_RUN
+                  value: "false"
+                - name: NETBOX_URL
+                  value: http://netbox.netbox.svc
+                # The firewall's address on the kubernetes VLAN; NET_MGMT (REDACTED_IP) isn't reachable from the nodes
+                - name: OPNSENSE_URL
+                  value: https://REDACTED_IP
+                - name: OMADA_URL
+                  value: https://REDACTED_IP
+                - name: IPA_URL
+                  value: https://ipa01.internal
+                - name: IPA_CA_BUNDLE
+                  value: /etc/ssl/ipa/ca-certificates.crt
+                - name: CLICKHOUSE_URL
+                  value: http://clickhouse-netflow.netflow.svc:8123
+                # Base of the "Traffic (Grafana)" buttons NetBox shows on addresses, devices and VMs
+                - name: GRAFANA_URL
+                  value: https://grafana.0b.au
+                - name: SITE_SLUG
+                  value: jack-cbr
+                - name: PVE_CLUSTER
+                  value: pve-jack-cbr
+                - name: FIREWALL_NAME
+                  value: jack-cbr-fw01
+                # keepalived floating IPs (found as extra /32s on VMs) -> NetBox FHRP group names
+                - name: VIP_NAMES
+                  value: "REDACTED_IP=dns,REDACTED_IP=dns,REDACTED_IP=dns"
+                # Server BMCs read over Redfish (hydrogen's iLO 4); login BMC_USER/BMC_PASSWORD
+                - name: BMC_HOSTS
+                  value: "REDACTED_IP"
+              envFrom:
+                - secretRef:
+                    name: netbox-sync
+              volumeMounts:
+                - name: ipa-ca
+                  mountPath: /etc/ssl/ipa
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  memory: 512Mi
+          volumes:
+            - name: ipa-ca
+              configMap:
+                name: ipa-ca

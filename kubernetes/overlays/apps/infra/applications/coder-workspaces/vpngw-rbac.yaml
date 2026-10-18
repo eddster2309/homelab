@@ -1,0 +1,42 @@
+# vpngw (garage) lists the peer ConfigMaps that Kubernetes workspaces on VPN
+# egress register while they run. Read-only; the token goes into garage's
+# vault.yml as vpngw_k8s_token, with ca.crt as vpngw_k8s_ca:
+#   kubectl -n coder-workspaces get secret vpngw-token -o jsonpath='{.data.token}' | base64 -d
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vpngw
+  namespace: coder-workspaces
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vpngw-token
+  namespace: coder-workspaces
+  annotations:
+    kubernetes.io/service-account.name: vpngw
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: vpngw
+  namespace: coder-workspaces
+rules:
+- apiGroups: [""]
+  resources: [configmaps]
+  verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vpngw
+  namespace: coder-workspaces
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vpngw
+subjects:
+- kind: ServiceAccount
+  name: vpngw
+  namespace: coder-workspaces

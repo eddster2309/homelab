@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: renovate-operator
+resources:
+- ../../../../../bases/renovate-operator
+- oidc-secret.yaml
+patches:
+- target:
+    kind: HelmRelease
+    name: renovate-operator
+  path: renovate-operator-patch.yaml

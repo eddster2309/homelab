@@ -1,0 +1,21 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: kafka-ui
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  path: ./kubernetes/overlays/infrastructure/infra/applications/kafka-ui
+  dependsOn:
+    - name: repositories-infra
+    - name: external-secrets-config
+    - name: authelia
+  healthChecks:
+    - kind: HelmRelease
+      name: kafka-ui
+      namespace: kafka-ui
+      apiVersion: helm.toolkit.fluxcd.io/v2
+  prune: true
+  sourceRef:
+    kind: "GitRepository"
+    name: "flux-system"

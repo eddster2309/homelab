@@ -1,0 +1,44 @@
+# Only these two paths are routed. /connect must never be reachable without the
+# Authelia middleware: rdpgw trusts the Remote-User header on it.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rdpgw-connect
+  annotations:
+    # rdp.0b.au is published through edge01
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure,websecure-pub
+    traefik.ingress.kubernetes.io/router.middlewares: traefik-authelia@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: rdp.0b.au
+      http:
+        paths:
+          - path: /connect
+            pathType: Exact
+            backend:
+              service:
+                name: rdpgw
+                port:
+                  name: http
+---
+# mstsc authenticates here with the token from the .rdp file, not an Authelia cookie
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rdpgw-gateway
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure,websecure-pub
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: rdp.0b.au
+      http:
+        paths:
+          - path: /remoteDesktopGateway/
+            pathType: Prefix
+            backend:
+              service:
+                name: rdpgw
+                port:
+                  name: http

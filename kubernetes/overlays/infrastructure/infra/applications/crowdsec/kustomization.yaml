@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: crowdsec
+resources:
+  - ../../../../../bases/crowdsec
+  - bouncer-key.yaml
+  - bouncer-middleware.yaml
+  - netflow-bouncer-key.yaml
+patches:
+  - target:
+      kind: HelmRelease
+      name: crowdsec
+    path: ./crowdsec-patch.yaml

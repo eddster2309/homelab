@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: netflow
+resources:
+- ../../../../../../bases/netflowui
+- ./credentials-secret.yaml
+- ./registry-pull-secret.yaml
+patches:
+- target:
+    kind: HelmRelease
+    name: netflowui
+  path: netflowui-patch.yaml

@@ -1,0 +1,7 @@
+namespace: clickhouse-operator
+resources:
+  - ../../../../../bases/clickhouse-operator
+patches:
+  - target:
+      kind: HelmRelease
+    path: ./clickhouse-operator-patch.yaml

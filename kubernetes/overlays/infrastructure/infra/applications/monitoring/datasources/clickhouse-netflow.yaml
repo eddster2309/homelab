@@ -1,0 +1,43 @@
+# NetFlow store in the netflow namespace (goflow2 -> Kafka -> ClickHouse).
+# Rendered as a Secret so the read-only grafana user's password stays out of
+# a ConfigMap; the datasource sidecar watches Secrets with this label too.
+# Vault: k8s-infra/netflow/clickhouse -> grafana_password (shared with the
+# netflow/clickhouse-credentials ExternalSecret that sets it on ClickHouse).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: grafana-datasource-clickhouse-netflow
+spec:
+  refreshInterval: "5m"
+  secretStoreRef:
+    name: vault-backend
+    kind: ClusterSecretStore
+  target:
+    name: grafana-datasource-clickhouse-netflow
+    creationPolicy: 'Owner'
+    template:
+      engineVersion: v2
+      metadata:
+        labels:
+          grafana_datasource: "1"
+      data:
+        clickhouse-netflow.yaml: |-
+          apiVersion: 1
+          datasources:
+            - name: ClickHouse - NetFlow
+              uid: clickhouse-netflow
+              type: grafana-clickhouse-datasource
+              jsonData:
+                host: clickhouse-netflow.netflow.svc.cluster.local
+                port: 8123
+                protocol: http
+                secure: false
+                username: grafana
+                defaultDatabase: netflow
+              secureJsonData:
+                password: '{{ .password }}'
+  data:
+    - secretKey: password
+      remoteRef:
+        key: netflow/clickhouse
+        property: grafana_password

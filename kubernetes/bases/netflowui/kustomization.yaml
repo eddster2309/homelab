@@ -1,0 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# No namespace.yaml: netflowui runs in the netflow namespace, which the netflow
+# overlay (overlays/infrastructure/infra/applications/netflow) owns.
+resources:
+- release.yaml
