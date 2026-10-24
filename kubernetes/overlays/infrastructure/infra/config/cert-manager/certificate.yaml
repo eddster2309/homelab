@@ -1,0 +1,23 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: example.com-tls
+  namespace: traefik
+spec:
+  secretName: example.com-tls
+  dnsNames:
+    - example.com
+    - '*.example.com'
+    - '*.example.com'
+    # Second-level wildcard for versitygw virtual-host style buckets
+    # (<bucket>.s3.0b.au) -- *.example.com only matches one label.
+    - '*.s3.0b.au'
+    - 0b.au
+    - "*.coder.0b.au"
+    - "*.0b.au"
+    - "*.pages.0b.au"
+    - "*.git.0b.au"
+    - "*.s3.0b.au"
+  issuerRef:
+    name: letsencrypt-issuer
+    kind: ClusterIssuer

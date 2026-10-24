@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://json.schemastore.org/kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: mariadb-operator
+resources:
+  - ../../../../../bases/mariadb-operator
+patches:
+  - target:
+      kind: HelmRelease
+      name: mariadb-operator-crds
+    path: mariadb-operator-crds-patch.yaml
+  - target:
+      kind: HelmRelease
+      name: mariadb-operator
+    path: mariadb-operator-patch.yaml

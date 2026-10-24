@@ -1,0 +1,18 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: infra
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  path: ./kubernetes/overlays/infrastructure/infra
+  prune: true
+  sourceRef:
+    kind: "GitRepository"
+    name: "flux-system"
+  healthChecks:
+    - kind: Kustomization
+      name: infra-config
+      namespace: flux-system
+      apiVersion: kustomize.toolkit.fluxcd.io/v1

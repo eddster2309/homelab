@@ -1,0 +1,17 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: rdpgw
+  namespace: flux-system
+spec:
+  interval: 1m0s
+  path: ./kubernetes/overlays/apps/infra/applications/rdpgw
+  healthChecks:
+    - kind: Deployment
+      name: rdpgw
+      namespace: rdpgw
+      apiVersion: apps/v1
+  prune: true
+  sourceRef:
+    kind: "GitRepository"
+    name: "flux-system"

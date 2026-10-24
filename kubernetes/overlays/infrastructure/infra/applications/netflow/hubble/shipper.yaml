@@ -1,0 +1,88 @@
+# hubble-shipper (Vector), one per node: reads that node's Hubble egress log and produces to
+# Kafka topic 'hubble', and its Traefik-to-pod log (pods.log) to 'hubble-pods'.
+# Config: ./vector.yaml (ConfigMap hubble-shipper-config).
+# The logs come from Cilium's dynamic exporter (../../cilium/cilium-helmchart-config.yaml).
+# See ../README.md "Kubernetes workloads".
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: hubble-shipper
+  labels:
+    app: hubble-shipper
+spec:
+  selector:
+    matchLabels:
+      app: hubble-shipper
+  template:
+    metadata:
+      labels:
+        app: hubble-shipper
+      annotations:
+        reloader.stakater.com/auto: "true"
+    spec:
+      # Cilium's exporter writes the log as root, mode 0600. Root with no capabilities
+      # reads it as its owner; the mount is read-only.
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+      tolerations:
+        - operator: Exists
+      containers:
+        - name: vector
+          image: timberio/vector:0.60.0-alpine
+          args: [--config, /etc/vector/vector.yaml]
+          env:
+            - name: NODE_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          ports:
+            - name: metrics
+              containerPort: 9598
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          # Restarts Vector when its Kafka producer is stuck dropping events (e.g. after a
+          # broker restart). ../vector-kafka-liveness.sh
+          livenessProbe:
+            exec:
+              command: [sh, /etc/vector-probe/vector-kafka-liveness.sh]
+            initialDelaySeconds: 60
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 3
+          volumeMounts:
+            - name: config
+              mountPath: /etc/vector
+              readOnly: true
+            - name: hubble
+              mountPath: /var/run/cilium/hubble
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/vector
+            - name: probe
+              mountPath: /etc/vector-probe
+              readOnly: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 48Mi
+            limits:
+              memory: 192Mi
+      volumes:
+        - name: config
+          configMap:
+            name: hubble-shipper-config
+        - name: hubble
+          hostPath:
+            path: /var/run/cilium/hubble
+            type: DirectoryOrCreate
+        - name: probe
+          configMap:
+            name: vector-kafka-liveness
+        # File positions; lost on reschedule, after which reading starts at the end.
+        - name: data
+          emptyDir: {}

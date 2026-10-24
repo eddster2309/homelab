@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rdpgw
+  labels:
+    app: rdpgw
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rdpgw
+  template:
+    metadata:
+      labels:
+        app: rdpgw
+      annotations:
+        reloader.stakater.com/auto: "true"
+    spec:
+      securityContext:
+        runAsUser: 1001
+        runAsNonRoot: true
+      containers:
+        - name: rdpgw
+          # master build of 2026-08-18: header auth panics in v2.2.0, the latest release
+          image: bolkedebruin/rdpgw@sha256:fd82a8616db4ad65cb8d8f2aab4ea582d447a8ace562cd3d1358e0c2aa1c3abd
+          # the image's run.sh needs root only to su to this user
+          command: ["/opt/rdpgw/rdpgw"]
+          workingDir: /opt/rdpgw
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: http
+          volumeMounts:
+            - name: config
+              mountPath: /opt/rdpgw/rdpgw.yaml
+              subPath: rdpgw.yaml
+              readOnly: true
+            - name: config
+              mountPath: /opt/rdpgw/default.rdp
+              subPath: default.rdp
+              readOnly: true
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: "1"
+              memory: 256Mi
+      volumes:
+        - name: config
+          configMap:
+            name: rdpgw-config

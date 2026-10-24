@@ -1,0 +1,22 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ch-ui
+spec:
+  interval: 30m
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    remediation:
+      retries: -1
+  chart:
+    spec:
+      chart: ./deploy/helm/ch-ui
+      # Upgrade on every new tag, not only when the chart's own version changes
+      reconcileStrategy: Revision
+      sourceRef:
+        kind: GitRepository
+        name: ch-ui
+        namespace: flux-system
+      interval: 12h

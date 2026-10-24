@@ -1,0 +1,16 @@
+---
+apiVersion: notification.toolkit.fluxcd.io/v1beta3
+kind: Alert
+metadata:
+  name: longhorn-ready
+  namespace: flux-system
+spec:
+  providerRef:
+    name: notify-from-longhorn
+  eventSeverity: info
+  eventSources:
+    - apiVersion: kustomize.toolkit.fluxcd.io/v1
+      kind: Kustomization
+      name: longhorn
+  inclusionList:
+    - "ReconciliationSucceeded"
