@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: geoip-db
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs
+  # The live claim was recreated bound to this volume with Flux owning the
+  # field; a bound claim's volumeName is immutable, so it has to be declared.
+  volumeName: pvc-137129a9-eac1-47d0-908b-2e3de1d746b0
+  resources:
+    requests:
+      storage: 1Gi

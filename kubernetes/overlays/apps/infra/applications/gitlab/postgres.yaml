@@ -1,0 +1,21 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: gitlab-db
+  namespace: gitlab
+spec:
+  inheritedMetadata:
+    labels:
+      recurring-job-group.longhorn.io/default: disabled
+  instances: 2
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6
+  postgresql:
+    parameters:
+      # CNPG's 5s default dropped the standby whenever its node was CPU-starved, and it
+      # fell back to restoring every WAL segment from S3 for 10 days (2026-10-28).
+      wal_sender_timeout: 60s
+      wal_receiver_timeout: 60s
+  storage:
+    size: 50Gi
+  monitoring:
+    enablePodMonitor: true

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: omada-exporter
+  labels:
+    app: omada-exporter
+spec:
+  selector:
+    app: omada-exporter
+  ports:
+    - name: metrics
+      port: 9202
+      targetPort: metrics
+      protocol: TCP

@@ -1,0 +1,19 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: clickhouse-operator
+spec:
+  # CRDs ship in the chart's crds/ dir, which Helm never upgrades by default
+  install:
+    crds: CreateReplace
+  upgrade:
+    crds: CreateReplace
+  values:
+    # Empty include only watches the operator's own namespace
+    watchNamespaces:
+      - netflow
+    # ServiceMonitor for the operator's metrics-exporter (ch-metrics :8888, per-CHI
+    # server metrics and table sizes) and the operator itself (:9999). The
+    # VictoriaMetrics operator converts it to a VMServiceScrape.
+    serviceMonitor:
+      enabled: true

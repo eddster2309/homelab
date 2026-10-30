@@ -1,0 +1,47 @@
+# Tenant: asher. VM accountID 1, Loki tenant "asher".
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMUser
+metadata:
+  name: asher
+  labels:
+    # Picked up by the VMAuth userSelector in vmauth.yaml.
+    ingest-tenant: "true"
+spec:
+  username: asher
+  passwordRef:
+    name: monitoring-tenant-asher
+    key: password
+
+  # Bounds a runaway or looping client so one tenant cannot exhaust vmauth for
+  # everyone else. vmauth's own default is 300.
+  max_concurrent_requests: 100
+
+  targetRefs:
+    # Metrics -> accountID 1.
+    #
+    # The path allowlist is the isolation: /insert/0/... is simply not listed, so
+    # this credential cannot reach the homelab tenant no matter what it sends.
+    - static:
+        url: "http://vminsert-vicmetrics-victoria-metrics-k8s-stack.monitoring.svc.cluster.local:8480"
+      paths:
+        - "/insert/1/prometheus/api/v1/write"
+
+    # Logs -> tenant "asher".
+    #
+    # Note the path is /asher/loki/... and NOT /loki/api/v1/push. vmauth falls
+    # back to the anonymous lane when credentials are absent *or invalid*, so if
+    # both lanes shared the push path, a tenant with a mistyped password would
+    # silently write into the homelab tenant instead of getting an error. A
+    # distinct prefix matches nothing in the anonymous lane, so a bad credential
+    # fails loudly. drop_src_path_prefix_parts strips the leading /asher so the
+    # gateway still receives /loki/api/v1/push.
+    #
+    # Metrics get this property for free, since /insert/1/ and /insert/0/ already
+    # differ.
+    - static:
+        url: "http://loki-gateway.monitoring.svc.cluster.local:80"
+      paths:
+        - "/asher/loki/api/v1/push"
+      drop_src_path_prefix_parts: 1
+      headers:
+        - "X-Scope-OrgID: asher"

@@ -1,0 +1,59 @@
+# Read-only Kubernetes access for the Netflow UI API (app/k8s/client.py): which
+# node announces each LoadBalancer / control-plane VIP. The ServiceAccount
+# netflow/netflowui is created by the HelmRelease (serviceAccount.netflowui).
+#
+# LoadBalancer IPs and node addresses, cluster-wide.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: netflowui-read
+rules:
+- apiGroups: [""]
+  resources: ["services", "nodes"]
+  verbs: ["list"]
+# Workload rollouts for chart annotations (app/k8s/rollouts.py).
+- apiGroups: ["apps"]
+  resources: ["replicasets", "controllerrevisions"]
+  verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: netflowui-read
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: netflowui-read
+subjects:
+- kind: ServiceAccount
+  name: netflowui
+  namespace: netflow
+---
+# Cilium L2 / kube-vip leases, and the kube-vip DaemonSet (for its address).
+# Must match K8S_LEASE_NAMESPACE.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: netflowui-leases
+  namespace: kube-system
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["list"]
+- apiGroups: ["apps"]
+  resources: ["daemonsets"]
+  verbs: ["list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: netflowui-leases
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: netflowui-leases
+subjects:
+- kind: ServiceAccount
+  name: netflowui
+  namespace: netflow

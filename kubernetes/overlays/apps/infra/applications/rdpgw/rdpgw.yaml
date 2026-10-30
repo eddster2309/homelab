@@ -1,0 +1,41 @@
+# Remote Desktop Gateway for mstsc (RDP over HTTPS). Authelia authenticates
+# /connect through Traefik forward-auth; rdpgw trusts the Remote-* headers.
+# Signing keys are left unset, so rdpgw generates them at start and a restart
+# invalidates .rdp files that were already downloaded.
+Server:
+  Authentication:
+    - header
+  # Traefik terminates TLS
+  Tls: disable
+  GatewayAddress: rdp.0b.au
+  Port: 8080
+  # the target comes from /connect?host=; netpol.yaml limits it to the build network
+  HostSelection: any
+  AllowPrivateDestinations: true
+  # unused with HostSelection any, but rdpgw refuses to start with an empty list
+  Hosts:
+    - localhost:3389
+Header:
+  UserHeader: Remote-User
+  # pod network: only Traefik can reach the pod (netpol.yaml)
+  TrustedProxies:
+    - REDACTED_IP/16
+  EmailHeader: Remote-Email
+  DisplayNameHeader: Remote-Name
+Caps:
+  TokenAuth: true
+  # The gateway tells the client which redirections are allowed, and they
+  # all default to off. Drives, printers and ports stay off.
+  EnableClipboard: true
+Client:
+  # the Authelia user is not the Windows user; default.rdp names the account
+  # the Coder Windows template uses instead
+  NoUsername: true
+  Defaults: /opt/rdpgw/default.rdp
+  # /connect?...&username= replaces the default (Coder Linux templates)
+  RdpOverridableKeys:
+    - username
+Security:
+  # requests arrive from Traefik, not from the client
+  VerifyClientIp: false
+  EnableUserToken: false

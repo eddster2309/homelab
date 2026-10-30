@@ -1,0 +1,7 @@
+namespace: strimzi
+resources:
+  - ../../../../../bases/strimzi
+patches:
+  - target:
+      kind: HelmRelease
+    path: ./strimzi-patch.yaml

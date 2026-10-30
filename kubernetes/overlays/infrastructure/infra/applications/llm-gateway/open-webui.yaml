@@ -1,0 +1,171 @@
+# Open WebUI at chat.0b.au, for testing the gateway. Authelia gates the host
+# (k8s-open-webui-users or k8s-open-webui-admin), then Open WebUI does its own
+# OIDC login against Authelia and maps the groups claim to its roles.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: open-webui-oidc
+spec:
+  refreshInterval: "5m"
+  secretStoreRef:
+    name: vault-backend
+    kind: ClusterSecretStore
+  target:
+    name: open-webui-oidc
+    creationPolicy: 'Owner'
+  data:
+  # Authelia holds the argon2id hash of this same value under 'hash'.
+  - secretKey: client-secret
+    remoteRef:
+      key: authelia/clients/open-webui
+      property: key
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: open-webui
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: open-webui
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  # SQLite on an RWO volume: one pod at a time.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: open-webui
+  template:
+    metadata:
+      labels:
+        app: open-webui
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: open-webui
+        image: ghcr.io/open-webui/open-webui:v0.12.5
+        ports:
+        - name: http
+          containerPort: 8080
+        env:
+        # Settings come from this manifest, not what Open WebUI saved in its
+        # database on first start (which kept the Ollama connection after the
+        # move to llama-swap). Admin-UI changes to them reset on restart.
+        - name: ENABLE_PERSISTENT_CONFIG
+          value: "false"
+        # The desktop runs llama-swap (OpenAI API); the gateway needs no key, but
+        # Open WebUI wants one.
+        - name: ENABLE_OLLAMA_API
+          value: "false"
+        - name: OPENAI_API_BASE_URL
+          value: http://ollama.llm.svc:11434/v1
+        - name: OPENAI_API_KEY
+          value: none
+        - name: WEBUI_URL
+          value: https://chat.0b.au
+        # Testing only: no web search, no HuggingFace downloads at startup.
+        - name: OFFLINE_MODE
+          value: "true"
+        - name: ENABLE_WEB_SEARCH
+          value: "false"
+        # SSO only.
+        - name: ENABLE_LOGIN_FORM
+          value: "false"
+        - name: ENABLE_SIGNUP
+          value: "false"
+        - name: ENABLE_OAUTH_SIGNUP
+          value: "true"
+        - name: OAUTH_MERGE_ACCOUNTS_BY_EMAIL
+          value: "true"
+        - name: OAUTH_PROVIDER_NAME
+          value: Authelia
+        - name: OPENID_PROVIDER_URL
+          value: https://auth.0b.au/.well-known/openid-configuration
+        - name: OPENID_REDIRECT_URI
+          value: https://chat.0b.au/oauth/oidc/callback
+        - name: OAUTH_CLIENT_ID
+          value: open-webui
+        - name: OAUTH_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: open-webui-oidc
+              key: client-secret
+        - name: OAUTH_SCOPES
+          value: openid email profile groups
+        - name: OAUTH_CODE_CHALLENGE_METHOD
+          value: S256
+        - name: ENABLE_OAUTH_ROLE_MANAGEMENT
+          value: "true"
+        - name: OAUTH_ROLES_CLAIM
+          value: groups
+        - name: OAUTH_ALLOWED_ROLES
+          value: k8s-open-webui-users,k8s-open-webui-admin
+        - name: OAUTH_ADMIN_ROLES
+          value: k8s-open-webui-admin
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 15
+        startupProbe:
+          httpGet:
+            path: /health
+            port: http
+          periodSeconds: 10
+          failureThreshold: 30
+        resources:
+          requests:
+            cpu: 50m
+            memory: 512Mi
+          limits:
+            memory: 1536Mi
+        volumeMounts:
+        - name: data
+          mountPath: /app/backend/data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: open-webui
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: open-webui
+spec:
+  selector:
+    app: open-webui
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+---
+# TLS comes from the traefik TLSStore wildcard.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: open-webui
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: traefik-authelia@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+  - host: chat.0b.au
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: open-webui
+            port:
+              number: 80

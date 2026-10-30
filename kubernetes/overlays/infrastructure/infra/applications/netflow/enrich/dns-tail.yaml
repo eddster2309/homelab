@@ -1,0 +1,122 @@
+# dns-tail image (GitLab homelab/homelab-network-ui, services/dns-tail), run as two
+# Deployments: `tail` reads Loki into ClickHouse, `maint` does the domain/workload
+# fixups and rollups. Each must stay at one replica: tail's cursor is max(ts) of what
+# it stored (two tailers would store rows twice), and maint's rollups resume from
+# their own last bucket.
+# tail: Blocky query log, edge01 HAProxy/nft and Traefik access logs (Loki) -> dns_answers,
+# edge_sessions, edge_events, traefik_requests.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dns-tail
+  labels:
+    app: dns-tail
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: dns-tail
+  template:
+    metadata:
+      labels:
+        app: dns-tail
+      annotations:
+        reloader.stakater.com/auto: "true"
+    spec:
+      imagePullSecrets:
+        - name: netflowui-registry
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+      containers:
+        - name: dns-tail
+          # Tag is 1.0.<pipeline iid> from GitLab CI; Renovate bumps it with the netflowui group
+          image: registry.git.0b.au/homelab/homelab-network-ui/dns-tail:1.0.18
+          args: [tail]
+          ports:
+            - name: metrics
+              containerPort: 9090
+          env:
+            - name: LOKI_URL
+              value: http://loki-gateway.monitoring.svc
+            - name: LOKI_TENANT
+              value: homelab
+            - name: CLICKHOUSE_URL
+              value: http://clickhouse-netflow:8123
+            - name: CLICKHOUSE_USER
+              value: enricher
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: clickhouse-credentials
+                  key: enricher_password
+          resources:
+            requests:
+              cpu: 20m
+              memory: 96Mi
+            limits:
+              memory: 384Mi
+---
+# maint: connection assignment, late domain/workload fixup, flows_domain_5m and
+# blocked rollups (every 2 minutes).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dns-maint
+  labels:
+    app: dns-maint
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: dns-maint
+  template:
+    metadata:
+      labels:
+        app: dns-maint
+      annotations:
+        reloader.stakater.com/auto: "true"
+    spec:
+      imagePullSecrets:
+        - name: netflowui-registry
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+      containers:
+        - name: dns-maint
+          # Tag is 1.0.<pipeline iid> from GitLab CI; Renovate bumps it with the netflowui group
+          image: registry.git.0b.au/homelab/homelab-network-ui/dns-tail:1.0.18
+          args: [maint]
+          ports:
+            - name: metrics
+              containerPort: 9090
+          env:
+            # Each fixup rewrites the whole of today's flows partition, so run maint every
+            # 10 min, not 2. Stays inside ASSIGN_OVERLAP (15 min) and FIXUP_MINUTES (30).
+            - name: MAINT_SECONDS
+              value: "600"
+            - name: LOKI_URL
+              value: http://loki-gateway.monitoring.svc
+            - name: LOKI_TENANT
+              value: homelab
+            - name: CLICKHOUSE_URL
+              value: http://clickhouse-netflow:8123
+            - name: CLICKHOUSE_USER
+              value: enricher
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: clickhouse-credentials
+                  key: enricher_password
+          resources:
+            requests:
+              cpu: 20m
+              memory: 96Mi
+            limits:
+              memory: 384Mi

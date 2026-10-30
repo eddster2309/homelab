@@ -1,0 +1,30 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rdpgw
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+  # only Traefik: anything else could forge the Remote-User header
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          role: ingress-controller
+  egress:
+  - ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+  # RDP to the build network (VLAN 801) only, where the Coder Windows VMs
+  # live, whatever host /connect?host= names. REDACTED_IP/12 is where vpngw
+  # (garage) maps Coder workspaces on VPN egress.
+  - to:
+    - ipBlock:
+        cidr: REDACTED_IP/24
+    - ipBlock:
+        cidr: REDACTED_IP/12
+    ports:
+    - port: 3389
+      protocol: TCP

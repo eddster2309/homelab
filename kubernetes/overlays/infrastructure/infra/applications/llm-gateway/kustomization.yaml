@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# LLM gateway: an unauthenticated in-cluster OpenAI-compatible endpoint
+# (ollama.llm:11434, name kept from Ollama days) for any workload, backed by
+# llama-swap/llama-server on jp-desktop's RTX 3080. Metrics are pushed from the
+# desktop by Alloy (job=llama-swap, job=llama-server, host=jp-desktop).
+#
+# The gateway reaches the desktop over mutual TLS:
+# - the desktop's HAProxy (~/llm on jp-desktop) only accepts a client cert
+#   signed by the `llm-ca` CA below with CN=llm-gateway;
+# - the gateway pins the desktop's self-signed server cert (desktop-cert.pem).
+# cert-manager renews the client cert and Reloader restarts the gateway, so
+# no secret is shared and the desktop never calls the cluster. One-off after
+# the first apply, copy the CA's public cert to the desktop:
+#   kubectl -n llm get secret llm-ca -o jsonpath='{.data.ca\.crt}' | base64 -d > ~/llm/tls/llm-ca.crt
+namespace: llm
+resources:
+- ./namespace.yaml
+- ./pki.yaml
+- ./deployment.yaml
+- ./service.yaml
+# Test UI at chat.0b.au; drop this line to remove it.
+- ./open-webui.yaml
+configMapGenerator:
+# Hash suffix rolls the gateway on any config or pinned-cert change.
+- name: llm-gateway
+  files:
+  - ./haproxy.cfg
+  - ./desktop-cert.pem

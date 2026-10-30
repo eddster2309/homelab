@@ -1,0 +1,68 @@
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: flows
+  labels:
+    strimzi.io/cluster: netflow
+spec:
+  partitions: 1
+  replicas: 1
+  config:
+    retention.ms: 86400000        # 24h — ClickHouse is the store
+    retention.bytes: 5368709120   # 5GiB cap
+---
+# Suricata EVE events (tls/http/alert) from eve-receiver; read by netflow.eve_queue
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: eve
+  labels:
+    strimzi.io/cluster: netflow
+spec:
+  partitions: 1
+  replicas: 1
+  config:
+    retention.ms: 86400000        # 24h — ClickHouse is the store
+    retention.bytes: 1073741824   # 1GiB cap
+---
+# pf filterlog blocks (WAN-inbound dropped) from eve-receiver; read by netflow.fw_queue
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: fwlog
+  labels:
+    strimzi.io/cluster: netflow
+spec:
+  partitions: 1
+  replicas: 1
+  config:
+    retention.ms: 86400000        # 24h — ClickHouse is the store
+    retention.bytes: 1073741824   # 1GiB cap
+---
+# Pod egress connections from Hubble (hubble-shipper, one per node); read by netflow.k8s_conns_queue
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: hubble
+  labels:
+    strimzi.io/cluster: netflow
+spec:
+  partitions: 1
+  replicas: 1
+  config:
+    retention.ms: 86400000        # 24h — ClickHouse is the store
+    retention.bytes: 1073741824   # 1GiB cap
+---
+# Pod IP -> workload for Traefik's backends (hubble-shipper); read by netflow.k8s_pods_queue
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: hubble-pods
+  labels:
+    strimzi.io/cluster: netflow
+spec:
+  partitions: 1
+  replicas: 1
+  config:
+    retention.ms: 86400000        # 24h — ClickHouse is the store
+    retention.bytes: 1073741824   # 1GiB cap

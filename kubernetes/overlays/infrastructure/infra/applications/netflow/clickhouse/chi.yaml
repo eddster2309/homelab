@@ -1,0 +1,211 @@
+# Single-node ClickHouse: 1 shard, 1 replica, plain MergeTree, so no Keeper.
+# Service: clickhouse-netflow:8123 (HTTP) / :9000 (native).
+#
+# No reloader annotation: the operator owns the StatefulSet and would fight
+# Reloader's edits. Passwords are injected as env from clickhouse-credentials;
+# after rotating one, bump spec.taskID to make the operator roll the pod.
+apiVersion: clickhouse.altinity.com/v1
+kind: ClickHouseInstallation
+metadata:
+  name: netflow
+spec:
+  defaults:
+    templates:
+      podTemplate: clickhouse
+      dataVolumeClaimTemplate: data
+  configuration:
+    users:
+      admin/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: admin_password
+      admin/networks/ip: "::/0"
+      admin/profile: default
+      admin/access_management: 1
+      grafana/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: grafana_password
+      grafana/networks/ip: "::/0"
+      grafana/profile: grafana
+      # netbox-sync (netbox namespace) refreshes the NetBox lookup tables; it can
+      # only touch netflow.nb_* (fill <t>_new, then EXCHANGE TABLES). It also reads
+      # flows (hourly) to find the ports LAN hosts serve on.
+      netbox_sync/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: netbox_sync_password
+      netbox_sync/networks/ip: "::/0"
+      netbox_sync/profile: default
+      netbox_sync/grants/query:
+        - "GRANT SELECT, INSERT, TRUNCATE, CREATE TABLE, DROP TABLE ON netflow.nb_*"
+        - "GRANT SELECT ON netflow.flows"
+        - "GRANT dictGet ON netflow.port_names_dict"
+      # enrich/ (dns-tail, intel-update): its own tables, plus the late domain
+      # fixup (ALTER UPDATE on flows) and the domain rollup.
+      enricher/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: enricher_password
+      enricher/networks/ip: "::/0"
+      enricher/profile: default
+      enricher/grants/query:
+        - "GRANT SELECT, INSERT, TRUNCATE, CREATE TABLE, DROP TABLE ON netflow.intel_*"
+        - "GRANT SELECT, INSERT, TRUNCATE, CREATE TABLE, DROP TABLE ON netflow.port_names*"
+        - "GRANT SELECT, INSERT ON netflow.dns_answers"
+        - "GRANT SELECT, INSERT ON netflow.conn_domains"
+        - "GRANT SELECT, INSERT ON netflow.edge_sessions*"
+        - "GRANT SELECT, INSERT ON netflow.traefik_requests*"
+        - "GRANT SELECT, INSERT ON netflow.edge_events*"
+        - "GRANT SELECT, INSERT ON netflow.flows_domain_5m"
+        # dns-tail's LAN-domain and workload rollups (16-, 17-*.sql); the LAN twin is
+        # covered by flows_blocked_* below.
+        - "GRANT SELECT, INSERT ON netflow.flows_lan_domain_5m"
+        - "GRANT SELECT, INSERT ON netflow.flows_k8s_1h"
+        # ... and the Security pages' (19-security-rollups.sql): flows_seg_1h, _svc_1h, _wan_1h.
+        - "GRANT SELECT, INSERT ON netflow.flows_seg_1h"
+        - "GRANT SELECT, INSERT ON netflow.flows_svc_1h"
+        - "GRANT SELECT, INSERT ON netflow.flows_wan_1h"
+        - "GRANT SELECT, INSERT ON netflow.flows_blocked_*"
+        - "GRANT SELECT, INSERT ON netflow.fw_rollup_cursor"
+        - "GRANT SELECT ON netflow.fw_blocks"
+        - "GRANT SELECT, ALTER UPDATE ON netflow.flows"
+        - "GRANT dictGet ON netflow.*"
+      # netflowui's threat-intel feed loader (app/intel/ in homelab-network-ui):
+      # creates and refills only its own tables and dictionaries (fill <t>_new,
+      # then EXCHANGE TABLES), never the enricher's intel_threat / intel_cloud.
+      # The API itself stays on the read-only grafana user.
+      netflowui_intel/password:
+        valueFrom:
+          secretKeyRef:
+            name: clickhouse-credentials
+            key: netflowui_intel_password
+      netflowui_intel/networks/ip: "::/0"
+      netflowui_intel/profile: default
+      netflowui_intel/grants/query:
+        - "GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE, TRUNCATE ON netflow.intel_ip"
+        - "GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE, TRUNCATE ON netflow.intel_ip_new"
+        - "GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE, TRUNCATE ON netflow.intel_domain"
+        - "GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE, TRUNCATE ON netflow.intel_domain_new"
+        - "GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE, TRUNCATE ON netflow.intel_asn"
+        - "GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE, TRUNCATE ON netflow.intel_asn_new"
+        - "GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE, TRUNCATE ON netflow.intel_feed_state"
+        - "GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE, TRUNCATE ON netflow.domain_rank"
+        - "GRANT SELECT, INSERT, CREATE TABLE, DROP TABLE, TRUNCATE ON netflow.domain_rank_new"
+        # Device classifier (13-classify.sql): plain inserts, one batch per hour.
+        - "GRANT SELECT, INSERT ON netflow.host_class"
+        # Per-device allowlist decisions (14-allowlist.sql): one row per click.
+        - "GRANT SELECT, INSERT ON netflow.host_allowlist"
+        # Wi-Fi history (15-wifi.sql): batched inserts from the Omada poller.
+        - "GRANT SELECT, INSERT ON netflow.wifi_client_samples"
+        - "GRANT SELECT, INSERT ON netflow.wifi_radio_samples"
+        - "GRANT CREATE DICTIONARY, DROP DICTIONARY, dictGet ON netflow.intel_ip_dict"
+        - "GRANT CREATE DICTIONARY, DROP DICTIONARY, dictGet ON netflow.intel_domain_dict"
+        - "GRANT CREATE DICTIONARY, DROP DICTIONARY, dictGet ON netflow.intel_asn_dict"
+        - "GRANT CREATE DICTIONARY, DROP DICTIONARY, dictGet ON netflow.domain_rank_dict"
+        # Only grantable globally (ClickHouse refuses it per dictionary and won't
+        # start); it just forces a dictionary refresh.
+        - "GRANT SYSTEM RELOAD DICTIONARY ON *.*"
+    files:
+      # ClickHouse's own logs (system.*_log): several default to no TTL at all,
+      # ~150 MB/day that would never be deleted. Cap the rest at 7 days, and
+      # keep text_log to warnings. query_log/part_log/trace_log get a whole
+      # <engine> instead: the operator's defaults set one for them, and
+      # ClickHouse refuses <ttl> alongside an <engine> (it crash-loops).
+      # Disabled outright (remove="1"; ~4.8k of ~57k CPU-s/day was merging them, and
+      # nothing here reads them; Prometheus gets its numbers from system.metrics/
+      # asynchronous_metrics, not the *_log tables): asynchronous_metric_log, error_log,
+      # metric_log, processors_profile_log, query_metric_log, query_views_log, trace_log.
+      # query_log and part_log stay for measuring, kept 2 days (2026-10-18; together
+      # ~90 MiB/day). The old tables of the disabled logs were dropped by hand on
+      # 2026-10-18; a log disabled later keeps its old rows until dropped.
+      # Changing a log table's TTL makes ClickHouse
+      # rename the old table to <name>_N on restart; drop those by hand.
+      config.d/system_logs.xml: |
+        <clickhouse>
+          <asynchronous_insert_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></asynchronous_insert_log>
+          <asynchronous_metric_log remove="1"/>
+          <background_schedule_pool_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></background_schedule_pool_log>
+          <error_log remove="1"/>
+          <metric_log remove="1"/>
+          <part_log><engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 2 DAY</engine></part_log>
+          <processors_profile_log remove="1"/>
+          <query_log><engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 2 DAY</engine></query_log>
+          <query_metric_log remove="1"/>
+          <query_views_log remove="1"/>
+          <text_log><level>warning</level><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></text_log>
+          <trace_log remove="1"/>
+        </clickhouse>
+      # Default codec for every column without an explicit CODEC, applied as parts
+      # merge. LZ4 was the default; ZSTD(1) decompresses nearly as fast and is smaller.
+      config.d/compression.xml: |
+        <clickhouse><compression><case><method>zstd</method><level>1</level></case></compression></clickhouse>
+      # Load every dictionary in the background as soon as the server starts. Lazily
+      # (the default), the first query to use one waits for its whole load: geoip_city_blocks
+      # ~160 s, intel_domain_dict ~10-26 s, past the UI's 30 s query timeout (2026-10-28).
+      # Not waiting for them at startup keeps the server accepting connections (inserts)
+      # meanwhile; a query that needs a dictionary still waits until it is loaded.
+      config.d/dictionaries.xml: |
+        <clickhouse>
+          <dictionaries_lazy_load>false</dictionaries_lazy_load>
+          <wait_dictionaries_load_at_startup>false</wait_dictionaries_load_at_startup>
+        </clickhouse>
+    profiles:
+      # readonly=2: read-only, but the Grafana plugin may still set query settings
+      grafana/readonly: 2
+    clusters:
+      - name: netflow
+        layout:
+          shardsCount: 1
+          replicasCount: 1
+  templates:
+    podTemplates:
+      - name: clickhouse
+        spec:
+          # As root the image entrypoint chowns everything under
+          # /var/lib/clickhouse and dies on the read-only geoip mount.
+          securityContext:
+            runAsUser: 101
+            runAsGroup: 101
+            fsGroup: 101
+          containers:
+            - name: clickhouse
+              # Held on 26.9 (renovate.json): on 26.10 the same merge workload took ~3.5x
+              # the CPU (2026-10-28).
+              image: clickhouse/clickhouse-server:26.9
+              volumeMounts:
+                # FILE dictionary sources must live under user_files_path
+                - name: geoip-db
+                  mountPath: /var/lib/clickhouse/user_files/geoip
+                  readOnly: true
+              # ClickHouse caps itself below the cgroup limit. About 1.2 GiB is
+              # dictionaries (GeoIP ~750 MiB, intel_domain_dict 320 MiB), and a reload
+              # holds the old and new copy at once: at 4Gi intel loads hit the cap.
+              resources:
+                requests:
+                  cpu: 250m
+                  memory: 2Gi
+                limits:
+                  # No CPU limit let an insert/merge catch-up spike starve the
+                  # control-plane node it shares a disk with etcd on (2026-10-17
+                  # rolling NotReady incident). Cap it. 2 cores absorbed merges but left
+                  # UI queries waiting for CPU longer than they ran (2026-10-30): 3.
+                  cpu: "3"
+                  memory: 6Gi
+          volumes:
+            - name: geoip-db
+              persistentVolumeClaim:
+                claimName: geoip-db
+    volumeClaimTemplates:
+      - name: data
+        spec:
+          storageClassName: longhorn
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 30Gi

@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- gitlab.yaml
+- gitlab-ci.yaml
+- gitlab-runner-fleeting.yaml
+- coder-workspaces.yaml
+- mealie.yaml
+- karakeep.yaml
+- immich.yaml
+- coder.yaml
+- rdpgw.yaml
+- paperless-ngx.yaml
+- netbox.yaml
+- harbor.yaml
+- versitygw.yaml

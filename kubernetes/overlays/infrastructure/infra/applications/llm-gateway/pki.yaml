@@ -1,0 +1,51 @@
+# Private CA for the gateway's client cert. Only its public ca.crt leaves the
+# cluster (to jp-desktop); it lasts 10 years so the desktop copy never changes.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: llm-ca
+spec:
+  isCA: true
+  commonName: llm-ca
+  secretName: llm-ca
+  duration: 87600h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: ClusterIssuer
+    name: selfsigned-cluster-issuer
+    group: cert-manager.io
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: llm-ca
+spec:
+  ca:
+    secretName: llm-ca
+---
+# The gateway's identity towards the desktop (which checks CN=llm-gateway).
+# Renewed with a new key 30 days before expiry; Reloader restarts the gateway.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: llm-gateway-client
+spec:
+  commonName: llm-gateway
+  secretName: llm-gateway-client
+  duration: 2160h
+  renewBefore: 720h
+  usages:
+  - client auth
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  # tls-combined.pem: key + cert in one file, as HAProxy's `crt` wants.
+  additionalOutputFormats:
+  - type: CombinedPEM
+  issuerRef:
+    kind: Issuer
+    name: llm-ca
+    group: cert-manager.io

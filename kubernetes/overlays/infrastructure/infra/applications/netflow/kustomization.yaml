@@ -1,0 +1,66 @@
+namespace: netflow
+resources:
+- ./namespace.yaml
+- ./secrets
+- ./kafka/kafka.yaml
+- ./kafka/topic.yaml
+- ./kafka/metrics.yaml
+- ./scrapes.yaml
+- ./geoip-pvc.yaml
+- ./geoip-cronjob.yaml
+- ./clickhouse/chi.yaml
+- ./clickhouse/schema-job.yaml
+- ./enrich/dns-tail.yaml
+- ./enrich/intel-update.yaml
+- ./goflow2-deployment.yaml
+- ./goflow2-service.yaml
+- ./eve/receiver.yaml
+- ./hubble/shipper.yaml
+configMapGenerator:
+# Hash suffix changes the Job spec on every SQL edit, so Flux recreates it
+- name: clickhouse-schema
+  files:
+  - ./clickhouse/schema/01-dictionaries.sql
+  - ./clickhouse/schema/02-exporters.sql
+  - ./clickhouse/schema/02-intel.sql
+  - ./clickhouse/schema/02-netbox.sql
+  - ./clickhouse/schema/02-traefik.sql
+  - ./clickhouse/schema/02-workloads.sql
+  - ./clickhouse/schema/03-flows.sql
+  - ./clickhouse/schema/04-rollup.sql
+  - ./clickhouse/schema/05-eve.sql
+  - ./clickhouse/schema/06-fwlog.sql
+  - ./clickhouse/schema/07-fw-rollup.sql
+  - ./clickhouse/schema/08-host-history.sql
+  - ./clickhouse/schema/09-edge.sql
+  - ./clickhouse/schema/10-traefik.sql
+  - ./clickhouse/schema/11-edge-events.sql
+  - ./clickhouse/schema/12-retention.sql
+  - ./clickhouse/schema/13-classify.sql
+  - ./clickhouse/schema/14-allowlist.sql
+  - ./clickhouse/schema/15-wifi.sql
+  - ./clickhouse/schema/16-lan-domain-rollup.sql
+  - ./clickhouse/schema/17-k8s-rollup.sql
+  - ./clickhouse/schema/18-fw-summary-rollup.sql
+  - ./clickhouse/schema/19-security-rollups.sql
+# enrich/ code: intel-update CronJob (hash suffix rolls it on change). dns-tail is an image now.
+- name: netflow-enrich-code
+  files:
+  - ./enrich/chclient.py
+  - ./enrich/intel_update.py
+# goflow2 -mapping file (hash suffix rolls the Deployment)
+- name: goflow2-mapping
+  files:
+  - mapping.yaml=./goflow2-mapping.yaml
+# eve/ receiver: Suricata EVE from OPNsense -> Kafka topic eve (hash suffix rolls the Deployment)
+- name: eve-receiver-config
+  files:
+  - ./eve/vector.yaml
+# hubble/ shipper: each node's Hubble egress and Traefik-to-pod logs -> Kafka topics hubble, hubble-pods (hash suffix rolls the DaemonSet)
+- name: hubble-shipper-config
+  files:
+  - ./hubble/vector.yaml
+# Liveness probe for both Vector workloads above (hash suffix rolls them on change)
+- name: vector-kafka-liveness
+  files:
+  - ./vector-kafka-liveness.sh

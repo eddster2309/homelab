@@ -1,0 +1,60 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: flux-operator
+spec:
+  valuesFrom:
+    # Keeps the plaintext OIDC client secret out of git and out of the values.
+    - kind: Secret
+      name: flux-operator-oidc
+      valuesKey: client-secret
+      targetPath: web.config.authentication.oauth2.clientSecret
+  values:
+    # FluxInstance, FluxReport and the ResourceSet APIs.
+    installCRDs: true
+    # Chart emits a prometheus-operator ServiceMonitor; the VictoriaMetrics
+    # operator converts it to a VMServiceScrape (disable_prometheus_converter
+    # is false in the monitoring overlay).
+    serviceMonitor:
+      create: true
+    # Flux Status web UI on port 9080. Authelia forward-auth is the outer gate;
+    # the UI then runs its own OIDC login and impersonates the user against the
+    # Kubernetes API, so access is decided by the cluster RBAC that user already
+    # has. TLS comes from the traefik TLSStore wildcard, no tls block.
+    web:
+      enabled: true
+      # Ships the flux-web-user / flux-web-admin ClusterRoles unbound. Nothing
+      # uses them today -- bind one if a non-admin ever needs scoped Flux
+      # access without cluster-wide RBAC.
+      rbac:
+        createRoles: true
+      # Impersonate the logged-in user rather than acting as the operator's own
+      # cluster-admin ServiceAccount. The apiserver runs with
+      # --oidc-username-claim=email --oidc-groups-claim=groups and no prefixes
+      # (ansible/vars/k8s.yaml), which is exactly what the UI impersonates, so a
+      # user gets the same permissions here as they do through kubectl.
+      userActions:
+        access: Impersonated
+      config:
+        baseURL: https://flux.0b.au
+        authentication:
+          type: OAuth2
+          oauth2:
+            provider: OIDC
+            issuerURL: https://auth.0b.au
+            clientID: flux-operator
+            # clientSecret comes from valuesFrom above.
+      ingress:
+        enabled: true
+        className: traefik
+        annotations:
+          traefik.ingress.kubernetes.io/router.middlewares: traefik-authelia@kubernetescrd
+        hosts:
+          - host: flux.0b.au
+            paths:
+              - path: /
+                pathType: ImplementationSpecific
+    priorityClassName: system-cluster-critical
+    # The chart has no podAnnotations value; commonAnnotations lands on the pod.
+    commonAnnotations:
+      reloader.stakater.com/auto: "true"

@@ -1,0 +1,43 @@
+apiVersion: renovate-operator.mogenius.com/v1alpha1
+kind: RenovateJob
+metadata:
+  name: renovate-github
+spec:
+  schedule: "0 * * * *"
+  secretRef: renovate-secret
+  provider:
+    name: github
+  image: ghcr.io/renovatebot/renovate:44.198.0
+  parallelism: 2
+  discoveryFilters:
+    - eddster2309/homelab-infra
+  extraEnv:
+    # Author commits as the PAT owner instead of Renovate's default
+    # renovate@whitesourcesoftware.com, a Mend-owned account with vigilant mode
+    # on that flags every commit here as Unverified.
+    - name: RENOVATE_GIT_AUTHOR
+      value: "Renovate Bot <16095534+eddster2309@users.noreply.github.com>"
+    # allowInternal is admin-only, so it can't live in the repo's
+    # renovate.json. These resolve to internal IPs but serve public certs.
+    - name: RENOVATE_HOST_RULES
+      value: >-
+        [{"matchHost": "https://git.0b.au", "allowInternal": true},
+        {"matchHost": "https://registry.git.0b.au", "allowInternal": true}]
+    # Credentials for private images on registry.git.0b.au, as an env host rule
+    # (<datasource>_<host>_USERNAME/PASSWORD) so the token stays in a Secret.
+    - name: RENOVATE_DETECT_HOST_RULES_FROM_ENV
+      value: "true"
+    - name: DOCKER_REGISTRY_GIT_0B_AU_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: renovate-registry
+          key: username
+    - name: DOCKER_REGISTRY_GIT_0B_AU_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: renovate-registry
+          key: password
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi

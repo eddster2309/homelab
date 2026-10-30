@@ -1,0 +1,96 @@
+# Blocky's cache-flush endpoint over HTTPS, one host per node, for the button
+# on the Blocky DNS Grafana dashboard (a browser on https://grafana.0b.au
+# can't POST to plain http). Only /api/cache/flush is routed; blocky sends its
+# own CORS headers.
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: external-service-blocky01
+  labels:
+    kubernetes.io/service-name: external-service-blocky01
+addressType: IPv4
+ports:
+  - port: 4000
+    name: http
+    protocol: TCP
+endpoints:
+  - addresses:
+    - "REDACTED_IP"
+    conditions:
+      ready: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-service-blocky01
+spec:
+  ports:
+    - port: 4000
+      protocol: TCP
+      targetPort: 4000
+      name: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: external-service-blocky01
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: api-blocky01.0b.au
+      http:
+        paths:
+        - backend:
+            service:
+              name: external-service-blocky01
+              port:
+                number: 4000
+          path: /api/cache/flush
+          pathType: Exact
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: external-service-blocky02
+  labels:
+    kubernetes.io/service-name: external-service-blocky02
+addressType: IPv4
+ports:
+  - port: 4000
+    name: http
+    protocol: TCP
+endpoints:
+  - addresses:
+    - "REDACTED_IP"
+    conditions:
+      ready: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-service-blocky02
+spec:
+  ports:
+    - port: 4000
+      protocol: TCP
+      targetPort: 4000
+      name: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: external-service-blocky02
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: api-blocky02.0b.au
+      http:
+        paths:
+        - backend:
+            service:
+              name: external-service-blocky02
+              port:
+                number: 4000
+          path: /api/cache/flush
+          pathType: Exact

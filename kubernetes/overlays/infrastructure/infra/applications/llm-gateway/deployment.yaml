@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llm-gateway
+  annotations:
+    # Restart when cert-manager renews llm-gateway-client.
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: llm-gateway
+  template:
+    metadata:
+      labels:
+        app: llm-gateway
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 99
+        runAsGroup: 99
+        fsGroup: 99
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: haproxy
+        image: haproxy:3.4.7-alpine
+        ports:
+        - name: http
+          containerPort: 11434
+        readinessProbe:
+          httpGet:
+            path: /gateway-health
+            port: http
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /gateway-health
+            port: http
+          periodSeconds: 30
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            memory: 64Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: [ALL]
+        volumeMounts:
+        - name: config
+          mountPath: /usr/local/etc/haproxy
+          readOnly: true
+        - name: client-cert
+          mountPath: /etc/llm-client
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: llm-gateway
+      - name: client-cert
+        secret:
+          secretName: llm-gateway-client
+          defaultMode: 0440

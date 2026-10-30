@@ -1,0 +1,219 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: netflowui
+spec:
+  values:
+    defaultPodOptions:
+      imagePullSecrets:
+        - name: netflowui-registry
+
+    # netflow/netflowui, bound in ../rbac. Only the API mounts its token.
+    serviceAccount:
+      netflowui: {}
+
+    controllers:
+      api:
+        # One replica, recreated on upgrade: the query cache, Omada poller and live
+        # WebSocket hub are per process, and the Omada cache PVC is RWO.
+        replicas: 1
+        strategy: Recreate
+        serviceAccount:
+          identifier: netflowui
+        pod:
+          # The chart defaults this to false; the API reads leases with its token.
+          automountServiceAccountToken: true
+          annotations:
+            reloader.stakater.com/auto: "true"
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            fsGroupChangePolicy: OnRootMismatch
+        containers:
+          app:
+            # Tags are 1.0.<pipeline iid>, pushed by the GitLab CI on main.
+            # Renovate bumps both (see renovate.json, group netflowui).
+            image:
+              repository: registry.git.0b.au/homelab/homelab-network-ui/api
+              tag: 1.0.19
+            env:
+              CLICKHOUSE_HOST: clickhouse-netflow.netflow.svc
+              CLICKHOUSE_PORT: "8123"
+              CLICKHOUSE_USER: grafana
+              CLICKHOUSE_DATABASE: netflow
+              CLICKHOUSE_PASSWORD:
+                valueFrom:
+                  secretKeyRef:
+                    name: clickhouse-credentials
+                    key: grafana_password
+              NETBOX_URL: https://netbox.0b.au
+              # NetBox answers one page of dcim/interfaces in ~22 s (2026-10-30), past the
+              # 20 s default; the snapshot is refreshed in the background, so waiting is cheap.
+              NETBOX_TIMEOUT_S: "90"
+              # K8S_URL unset: the in-cluster ServiceAccount is used.
+              K8S_LEASE_NAMESPACE: kube-system
+              OMADA_VERIFY_SSL: "false"
+              OMADA_CACHE_DIR: /cache
+              # Same origin behind the ingress; only matters for a direct LIVE_WS_URL.
+              API_CORS_ORIGINS: '["https://netflow.0b.au"]'
+              # Threat-intel feed loader: its own writer (the API stays on grafana).
+              INTEL_WRITER_USER: netflowui_intel
+              INTEL_WRITER_PASSWORD:
+                valueFrom:
+                  secretKeyRef:
+                    name: clickhouse-credentials
+                    key: netflowui_intel_password
+              # Device classifier and Ask AI LLM (ollama.llm: llama-swap on a desktop GPU behind
+              # the gateway, 503 when it is off; rules and similarity still run). Empty disables it.
+              CLASSIFY_LLM_URL: http://ollama.llm.svc:11434
+              # Org logos persist next to the Omada cache.
+              LOGO_CACHE_DIR: /cache/logos
+              # Pod egress is SNATed to the node IPs: hide the app's own RDAP, feed
+              # and logo lookups from them in the data it shows.
+              APP_EGRESS_HOSTS: REDACTED_IP,REDACTED_IP,REDACTED_IP
+            envFrom:
+              - secretRef:
+                  name: netflowui-credentials
+            probes:
+              # /api/livez never touches ClickHouse/NetBox/Omada, so an outage
+              # there doesn't restart the pod. /api/health has the dependency checks.
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /api/livez
+                    port: 8008
+                  periodSeconds: 20
+                  timeoutSeconds: 5
+                  failureThreshold: 3
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /api/livez
+                    port: 8008
+                  periodSeconds: 20
+                  timeoutSeconds: 5
+                  failureThreshold: 3
+              startup:
+                enabled: true
+                custom: true
+                spec:
+                  httpGet:
+                    path: /api/livez
+                    port: 8008
+                  periodSeconds: 2
+                  failureThreshold: 30
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop: ["ALL"]
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                # CACHE_MAX_MB is 128 by default, plus result sets in flight.
+                memory: 1Gi
+
+      ui:
+        replicas: 1
+        strategy: RollingUpdate
+        pod:
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+            runAsUser: 1000
+            runAsGroup: 1000
+        containers:
+          app:
+            image:
+              repository: registry.git.0b.au/homelab/homelab-network-ui/ui
+              tag: 1.0.18
+            # API_URL / FRIGATE_URL are baked in at build time (CI build args).
+            probes:
+              liveness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: 3000
+                  periodSeconds: 20
+                  timeoutSeconds: 5
+              readiness:
+                enabled: true
+                custom: true
+                spec:
+                  tcpSocket:
+                    port: 3000
+                  periodSeconds: 20
+                  timeoutSeconds: 5
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop: ["ALL"]
+            resources:
+              requests:
+                cpu: 50m
+                memory: 128Mi
+              limits:
+                memory: 512Mi
+
+    # Services netflowui-api:8008 and netflowui-ui:3000. The UI image's /api
+    # rewrite fallback points at http://netflowui-api:8008.
+    service:
+      api:
+        controller: api
+        ports:
+          http:
+            port: 8008
+      ui:
+        controller: ui
+        ports:
+          http:
+            port: 3000
+
+    # TLS comes from the traefik TLSStore wildcard (*.0b.au). /api (including the
+    # Live page's WebSocket, /api/live/ws) goes straight to the API; Traefik
+    # matches the longer prefix first. Authelia ACL: netflow.0b.au in
+    # authelia/config/config.acl.yaml. To change the host, change it here, there,
+    # and API_CORS_ORIGINS above.
+    ingress:
+      main:
+        className: traefik
+        annotations:
+          traefik.ingress.kubernetes.io/router.middlewares: traefik-authelia@kubernetescrd
+        hosts:
+          - host: netflow.0b.au
+            paths:
+              - path: /api
+                pathType: Prefix
+                service:
+                  identifier: api
+                  port: http
+              - path: /
+                pathType: Prefix
+                service:
+                  identifier: ui
+                  port: http
+
+    persistence:
+      # Omada's last good data, port-rate baselines and roam history, so a
+      # restart serves them at once.
+      omada-cache:
+        type: persistentVolumeClaim
+        storageClass: longhorn
+        accessMode: ReadWriteOnce
+        size: 256Mi
+        advancedMounts:
+          api:
+            app:
+              - path: /cache
